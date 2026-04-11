@@ -112,6 +112,15 @@ allocator, file operations, string operations, and more.
 - See the `print`, `assert`, and `panic` macros for printing/assertions/panics.
 - See the `info`, `warn`, and `error` macros for user-facing logs.
 
+## Todo
+
+- [ ] Flesh out Windows support
+- [ ] Piping mechanism
+- [ ] Directory entries (could just be achieved with strings)
+- [ ] Dynamic array (and perhaps a #define for enabling dynamic allocation)
+- [ ] Hash table/set
+- [ ] Optional function prefixes (perhaps with `#define CBA_STRIP_PREFIXES`)
+
 <!--
 ## API
 
