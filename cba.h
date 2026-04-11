@@ -644,9 +644,9 @@ typedef struct Command Command;
 
 #define CBA_COMPILER_INPUTS(...) __VA_ARGS__
 
-CBA_DEF void __cba_rebuild_build(int argc, char** argv, const char* source_path, ...);
-#define CBA_REBUILD(argc, argv) __cba_rebuild_build((argc), (argv), __FILE__, NULL)
-#define CBA_REBUILD_WITH(argc, argv, ...) __cba_rebuild_build((argc), (argv), __FILE__, __VA_ARGS__, NULL)
+CBA_DEF void __cba_rebuild(int argc, char** argv, const char* source_path, ...);
+#define CBA_REBUILD(argc, argv) __cba_rebuild((argc), (argv), __FILE__, NULL)
+#define CBA_REBUILD_WITH(argc, argv, ...) __cba_rebuild((argc), (argv), __FILE__, __VA_ARGS__, NULL)
 
 /// Returns an absolute path to the current working directory (i.e., wherever the program
 /// was run from).
