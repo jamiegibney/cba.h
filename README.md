@@ -5,10 +5,9 @@ For when you CBA with CMake.
 This is a [stb-style header-only library](https://github.com/nothings/stb)
 designed for writing build recipes in C, and for useful C utilities.
 
-The idea is mostly based on tsoding's [nob.h
-library](https://github.com/tsoding/nob.h), but with many changes that I either
-prefer or that I'm experimenting with. If you don't know about tsoding's
-content, please do yourself a favour and check it out!
+The idea is chiefly based on tsoding's [nob.h
+library](https://github.com/tsoding/nob.h), but with a variety changes that I
+either prefer or which I'm experimenting with.
 
 ## Usage
 
@@ -46,6 +45,7 @@ int main(int argc, char** argv) {
 }
 ```
 
+<!--
 A more thorough example:
 
 ```c
@@ -97,6 +97,7 @@ int main(int argc, char** argv) {
     return 0;
 }
 ```
+-->
 
 ## Extras
 
