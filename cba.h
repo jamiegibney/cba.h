@@ -185,8 +185,6 @@
     #error unsupported complier
 #endif
 
-#define CBA_ANSI !CBA_MSVC
-
 #if defined(_WIN32)
     #undef CBA_WINDOWS
     #define CBA_WINDOWS 1
@@ -320,7 +318,7 @@
     #undef error
 #endif
 
-#if CBA_ANSI
+#ifndef CBA_NO_COLOR_OUTPUT
     #define print(s, ...)                                                                    \
         printf("\e[1m%s:%04i\e[0m: " s "\n", __FILE_NAME__, __LINE__, ## __VA_ARGS__)
 
@@ -345,6 +343,7 @@
     #define info(s, ...)  printf("[\e[1;32m" CBA_INFO_PREFIX "\e[0m] " s "\n", ## __VA_ARGS__)
     #define warn(s, ...)  printf("[\e[1;33m" CBA_WARN_PREFIX "\e[0m] " s "\n", ## __VA_ARGS__)
     #define error(s, ...) fprintf(stderr, "[\e[1;31m" CBA_ERROR_PREFIX "\e[0m] " s "\n", ## __VA_ARGS__)
+    #define ping printf("\e[1;32mPING\e[0m @ %s:\e[1m%04i\e[0m\n", __FILE_NAME__, __LINE__)
 #else
     #define print(s, ...)                                                                    \
         printf("%s:%04i: " s "\n", __FILE_NAME__, __LINE__, ## __VA_ARGS__)
@@ -370,6 +369,7 @@
     #define info(s, ...)  printf("[" CBA_INFO_PREFIX "] " s "\n", ## __VA_ARGS__)
     #define warn(s, ...)  printf("[" CBA_WARN_PREFIX "] " s "\n", ## __VA_ARGS__)
     #define error(s, ...) fprintf(stderr, "[" CBA_ERROR_PREFIX "] " s "\n", ## __VA_ARGS__)
+    #define ping printf("PING @ %s:%04i\n", __FILE_NAME__, __LINE__)
 #endif
 
 #ifdef CBA_VERBOSE
@@ -378,7 +378,6 @@
     #define verbose_print(s, ...)
 #endif
 
-#define ping printf("\e[1;32mPING\e[0m @ %s:\e[1m%04i\e[0m\n", __FILE_NAME__, __LINE__)
 #define todo() panic("TODO: %s", __PRETTY_FUNCTION__)
 #define unreachable() CBA_UNREACHABLE; panic("unreachable code path was hit")
 
