@@ -595,7 +595,7 @@ typedef struct Command Command;
 #define is_alpha(ch)   (is_upper(ch) || is_lower(ch))
 #define is_numeric(ch) ('0' <= (ch) && (ch) <= '9')
 #define is_decimal(ch) ((ch) == '.' || (ch) == ',')
-#define is_alphanumeric(ch) (is_alpha(ch) || is_number(ch))
+#define is_alphanumeric(ch) (is_alpha(ch) || is_numeric(ch))
 #define is_whitespace(ch) ((ch) == ' ' || (ch) == '\n' || (ch) == '\r' || (ch) == '\t')
 #define is_separator(ch) ((ch) == '\\' || (ch) == '/')
 
