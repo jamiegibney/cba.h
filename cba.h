@@ -490,7 +490,7 @@ enum FileType {
     /// The file type could not be detected.
     FILE_TYPE_UNKNOWN = 0,
     /// The file is a regular file.
-    FILE_TYPE_FILE,
+    FILE_TYPE_REGULAR,
     /// The file is a directory.
     FILE_TYPE_DIRECTORY,
     /// The file is a symbolic link.
@@ -1554,7 +1554,7 @@ CBA_DEF FileType file_get_type(const char* path) {
     uninit struct stat statbuf;
     if (lstat(path, &statbuf) >= 0) {
         if (S_ISREG(statbuf.st_mode)) {
-            result = FILE_TYPE_FILE;
+            result = FILE_TYPE_REGULAR;
         }
         else if (S_ISDIR(statbuf.st_mode)) {
             result = FILE_TYPE_DIRECTORY;
