@@ -2561,8 +2561,16 @@ CBA_DEF b32 str_starts_with(String str, const char* cstr) {
 }
 
 CBA_DEF b32 str_ends_with(String str, const char* cstr) {
+    b32 result = false;
+
     usize len = (usize)strlen(cstr);
-    return (str.len >= len) && (memcmp(str.data + len, cstr, len) == 0);
+
+    if (len <= str.len) {
+        u8* ptr = str.data + (str.len - len);
+        result = memcmp(ptr, cstr, len) == 0;
+    }
+
+    return result;
 }
 
 CBA_DEF b32 str_find_first_char(String haystack, char needle, usize* where) {
