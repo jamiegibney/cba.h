@@ -136,7 +136,6 @@
     ------------------------------------------------------------------------------
 */
 
-// @todo: prefixes
 
 #ifndef CBA_ARRAY_CAPCITY
     #define CBA_ARRAY_CAPCITY (256)
