@@ -244,6 +244,7 @@
     #include <signal.h>
     #include <fcntl.h>
     #include <dirent.h>
+    #include <ftw.h>
 #endif
 
 #if CBA_MSVC
@@ -2212,12 +2213,44 @@ CBA_DEF StringArray str_to_parent_paths(String path) {
 }
 
 CBA_DEF StringArray str_to_directory_entries(String path, b32 include_directory_path) {
-    (void)(path);
-    (void)(include_directory_path);
-
     StringArray result = {0};
 
+    assert(path.data[path.len] == '\0', "path string is not null-terminated");
+    char* path_cstr = (char*)path.data;
+
+#if CBA_WINDOWS
     todo();
+#else
+    FileType ft = file_get_type(path_cstr);
+    assert(ft == FILE_TYPE_DIRECTORY, "the path \"%s\" is not a directory", path_cstr);
+
+    DIR* d = opendir(path_cstr);
+    assert(d, "failed to open dir \"%s\": %s", path_cstr, strerror(errno));
+
+    struct dirent* dent = NULL;
+
+    while ((dent = readdir(d))) {
+        if ((dent->d_type == DT_LNK) || (dent->d_type == DT_DIR) || (dent->d_type == DT_REG)) {
+            String entry = str_alloc_with_cap(CBA_MAX_PATH);
+
+            if (include_directory_path) {
+                str_append_other(&entry, path);
+
+                if (!is_separator(path.data[path.len - 1])) {
+                    str_append_char(&entry, CBA_PATH_SEPARATOR);
+                }
+            }
+
+            str_append_chars(&entry, (char*)dent->d_name, (usize)dent->d_namlen);
+
+            if (!str_ends_with(entry, ".") && !str_ends_with(entry, "..")) {
+                str_arr_append(&result, entry);
+            }
+        }
+    }
+
+    closedir(d);
+#endif
 
     return result;
 }
