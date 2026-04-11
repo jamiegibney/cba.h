@@ -92,6 +92,17 @@
         - alloc_array()   allocate a number of typed elements
     - The String type is always null-terminated UNLESS you take a slice of another
       string. In this case, use `str_copy` to get a null-terminated compatible copy.
+    - You can print Strings as below:
+
+    ```c
+    String s1 = str_from_cstr("Hello, world!");
+    print("the string is: " stok, sfmt(s1));
+
+    // or, e.g.
+
+    String s2 = strl("Hello, sailor!"); // directly wrap a string literal
+    print("the other string is: `%.*s`", sfmt(s));
+    ```
 
 
 
