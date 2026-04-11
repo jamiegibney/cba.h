@@ -17,95 +17,68 @@ wget https://raw.githubusercontent.com/jamiegibney/cba.h/refs/heads/master/cba.h
 
 ## Usage
 
-The below file is built with any C compiler (e.g. `gcc -o cba cba.c`), and
-then run to build a main program. The program will automatically rebuild itself
-when modified, so it doesn't need to be recompiled manually.
+Add `#define CBA_IMPLEMENTATION` before including `cba.h` in ONE C/C++ file to
+generate the implementation:
 
 ```c
+#include ...
+#include ...
 #define CBA_IMPLEMENTATION
+#include "cba.h"
+```
+
+And otherwise just `#include "cba.h` for its definitions.
+
+### Simple example
+
+```c
+// File: cba.c
+
+#define CBA_VERBOSE          // See internal logging.
+#define CBA_PRINT_ON_REBUILD // Print a message when rebuilding.
+#define CBA_IMPLEMENTATION   // Generate implementations.
 #include "cba.h"
 
 int main(int argc, char** argv) {
-    CBA_BOOTSTRAP(argc, argv);
+    // Allow the program to rebuild itself when modified.
+    CBA_REBUILD(argc, argv);
 
-    assert(try_mkdir("build"), "failed to create build directory");
+    // Recursively create a directory.
+    assert(try_mkdir("build/artefacts"), "failed to create build directory");
 
+    // A command is an array of arguments which can be run via the shell.
     Command cmd = {0};
 
+    // Use the CBA_COMPILER_* macros for compiler-specific flags.
     cmd_append(&cmd,
         CBA_COMPILER_C,
         CBA_COMPILER_DEBUG_FLAGS,
         CBA_COMPILER_COMMON_FLAGS,
-        CBA_COMPILER_OUTPUT("build/main"),
+        CBA_COMPILER_OUTPUT("build/artefacts/main"),
         CBA_COMPILER_INPUTS("main.c"),
     );
 
-    // with clang, the above creates:
-    // "clang -Wall -Wextra -glldb -DDEBUG -o build/main main.c"
-    // or with MSVC:
-    // "cl.exe /W4 /nologo /ZI /DDEBUG /Fe:build/main.c main.c"
+    // With GCC, the above forms:
+    //   gcc -ggdb -DDEBUG -Wall -Wextra -o build/artefacts/main main.c
+    //
+    // And with MSVC:
+    //   cl.exe /ZI /DDEBUG /W4 /nologo /Fe:build/artefacts/main main.c
 
+    // Run the command, block until it terminates, and assert that it exits normally.
     cmd_run(cmd);
 
     return 0;
 }
 ```
 
-<!--
-A more thorough example:
-
-```c
-#define CBA_IMPLEMENTATION
-#include "cba.h"
-
-int main(int argc, char** argv) {
-    // Allow the program to rebuild itself when modified
-    CBA_BOOTSTRAP(argc, argv);
-
-
-    // Create a command for appending arguments to
-    Command cmd = {0};
-
-    // You can manually append arguments
-    cmd_append(&cmd, "gcc", "-o", "main", "main.c");
-
-    // Or you can use compiler-specific macros
-    cmd_append(&cmd,
-        // e.g. "gcc" or "cl.exe"
-        CBA_COMPILER_C,
-        // e.g. "-o main", or "/Fe:main"
-        CBA_COMPILER_OUTPUT("main"),
-        CBA_COMPILER_INPUTS("main.c")
-    );
-
-
-    // Execute the command, block until it terminates, and assert that it exits normally
-    cmd_run(cmd);
-
-    // Or without the assertion
-    bool success = cmd_try_run(cmd);
-
-    // Or without blocking...
-    ProcessID pid = cmd_run(cmd, .async = true);
-
-    // ..which you can later wait for
-    proc_wait(pid);
-
-
-    // You can reset commands to reuse them
-    cmd_reset(&cmd);
-
-
-    // And for convenience, you can also run whole commands in one call
-    cmd_run_direct("gcc -o main main.c");
-
-
-    return 0;
-}
+Compile the above once with, e.g.:
+```sh
+gcc -o cba cba.c
 ```
--->
 
-## Extras
+And when the source file is modified, the program will automatically rebuild itself when run.
+
+## Other utilities
 
 `cba.h` also provides various utilties for C programs, including an arena
 allocator, file operations, string operations, and more.
@@ -121,10 +94,9 @@ allocator, file operations, string operations, and more.
 ## Todo
 
 - [ ] Flesh out Windows support
-- [ ] Piping mechanism
-- [ ] Directory entries (could just be achieved with strings)
 - [ ] Dynamic array (and perhaps a #define for enabling dynamic allocation)
 - [ ] Hash table/set
+- [ ] Piping mechanism
 - [ ] Optional function prefixes (perhaps with `#define CBA_STRIP_PREFIXES`)
 
 <!--
