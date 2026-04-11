@@ -1183,6 +1183,8 @@ CBA_DEF String get_cwd(void) {
 
     assert(cwd, "failed to obtain current working directory");
 
+    result.len = (usize)strlen(cwd);
+
     return result;
 }
 
