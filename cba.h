@@ -20,12 +20,13 @@
     #define CBA_VERBOSE            to see internal logging (e.g. for errors)
     #define CBA_NO_COLOR_OUTPUT    to prevent coloured output (remove ANSI codes)
     #define CBA_PRINT_ON_REBUILD   to see a message when a program rebuilds itself
+
+    All functions in this header are documented via comments above their definitions.
   
 
 
-    # Simple example
+    # Example
   
-    ```c
     #define CBA_IMPLEMENTATION
     #include "cba.h"
   
@@ -59,17 +60,6 @@
 
         return 0;
     }
-    ```
-
-    See also:
-
-    - cmd_try_run(cmd)                         for a non-asserting version
-    - cmd_run_direct("command args")           for running a command in-line
-    - cmd_run(cmd, .output_string = &string)   for capturing a command's output
-    - cmd_run(cmd, .async_pid = &pid)          for non-blocking commands, and
-      proc_wait(pid)                           to wait on running processes
-
-    All functions are documented via the comments above their definitions.
 
 
 
@@ -89,65 +79,24 @@
     # Notes
 
     - cba.h does not use dynamic allocations: it uses a single global arena with a
-      fixed-size memory block. Use the following for allocations:
+      fixed-size memory block. You can use the following for allocations:
         - alloc()         allocate an instance of a type
         - alloc_bytes()   allocate a number of bytes
         - alloc_array()   allocate a number of typed elements
-    - The String type is always null-terminated UNLESS you take a slice of another
-      string. You can use `str_to_cstr` or `str_copy` to get a null-terminated version.
+
     - You can print Strings with `print(stok, sfmt(the_string));`
         - stok   expands to "`%.*s`"
         - sfmt   expands to (int)str.len, (const char*)str.data
 
+    - The String type is always null-terminated UNLESS you take a "slice" of another string.
+      You can use `str_to_cstr` or `str_copy` to allocate a null-terminated version.
 
-
-    # Version history
-
-    - v0.1.2 (11 Apr 2026) (by @jamiegibney)
-        - added CBA_NO_COLOR_OUTPUT
-        - assert and panic now use traps
-        - global arena/memory block are extern, and declared in CBA_IMPLEMENTATION block
-        - updated rebuild commands
-        - improved documentation
-        - minor fixes
-    - v0.1.1 (11 Apr 2026) (by @jamiegibney)
-        - implemented str_to_directory_entries
-        - added recursive deletion to file_delete
-        - file_length now only stats
-        - rebuild now checks for cba.h in cwd
-        - fixed get_cwd
-        - fixed str_ends_with
-        - renamed FILE_TYPE_FILE to FILE_TYPE_REGULAR
-        - renamed CBA_PATH_SEP to CBA_PATH_SEPARATOR
-    - v0.1.0 (11 Apr 2026) (by @jamiegibney)
-        - initial release
+    - Consider using CBA_PATH_SEPARATOR in paths, OR prefer to use `/` which is
+      automatically converted on Windows where needed.
 
 
 
-    # License
-    ------------------------------------------------------------------------------
-    MIT License
-
-    Copyright (c) 2026 Jamie Gibney
-
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE.
-    ------------------------------------------------------------------------------
+    For version history and a copy of the license, see the bottom of the file.
 */
 
 
@@ -3447,3 +3396,54 @@ CBA_DEF char* cmd_flatten_to_cstr_with_delims(Command cmd, char delim) {
 }
 
 #endif // CBA_IMPLEMENTATION
+
+/*
+    # Version history
+
+    - v0.1.2 (11 Apr 2026) (by @jamiegibney)
+        - added CBA_NO_COLOR_OUTPUT
+        - assert and panic now use traps
+        - global arena/memory block are extern, and declared in CBA_IMPLEMENTATION block
+        - updated rebuild commands
+        - improved documentation
+        - minor fixes
+    - v0.1.1 (11 Apr 2026) (by @jamiegibney)
+        - implemented str_to_directory_entries
+        - added recursive deletion to file_delete
+        - file_length now only stats
+        - rebuild now checks for cba.h in cwd
+        - fixed get_cwd
+        - fixed str_ends_with
+        - renamed FILE_TYPE_FILE to FILE_TYPE_REGULAR
+        - renamed CBA_PATH_SEP to CBA_PATH_SEPARATOR
+    - v0.1.0 (11 Apr 2026) (by @jamiegibney)
+        - initial release
+
+
+
+    # License
+
+    ------------------------------------------------------------------------------
+    MIT License
+
+    Copyright (c) 2026 Jamie Gibney
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+    ------------------------------------------------------------------------------
+*/
