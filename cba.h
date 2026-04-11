@@ -1,7 +1,7 @@
 /*  
     cba.h | v0.1.2 | https://github.com/jamiegibney/cba.h
   
-    STB-style header library for build recipes and general utilities in C.
+    Single-header library for build recipes and general utilities in C.
 
 
   
@@ -18,8 +18,8 @@
     Before the include, you can also add:
 
     #define CBA_VERBOSE            to see internal logging (e.g. for errors)
-    #define CBA_NO_COLOR_OUTPUT    to prevent coloured output (ANSI codes)
-    #define CBA_PRINT_ON_REBUILD   to see a message when the program rebuilds itself
+    #define CBA_NO_COLOR_OUTPUT    to prevent coloured output (remove ANSI codes)
+    #define CBA_PRINT_ON_REBUILD   to see a message when a program rebuilds itself
   
 
 
@@ -33,7 +33,7 @@
         // Allow the program to rebuild itself when modified.
         CBA_REBUILD(argc, argv);
 
-        // Optionally create a directory.
+        // Create a directory (also works recursively).
         assert(try_mkdir("build"), "failed to create build directory");
 
         // A command is an array of arguments, which later can be run via the shell.
@@ -67,15 +67,15 @@
     - cmd_run_direct("command args")           for running a command in-line
     - cmd_run(cmd, .output_string = &string)   for capturing a command's output
     - cmd_run(cmd, .async_pid = &pid)          for non-blocking commands, and
-      proc_wait(pid)                           to wait on async commands
+      proc_wait(pid)                           to wait on running processes
 
-    All functions are documented: see the comments above their definitions for details.
+    All functions are documented via the comments above their definitions.
 
 
 
-    # Overrideable defines
+    # Other options
 
-    Before including this file, #define any of the below to override them:
+    Before including this file, #define any of the below options to override them:
   
     - CBA_REBUILD_COMMAND            the command to use for rebuilding
     - CBA_REBUILD_MESSAGE            formatted message printed when rebuilding
@@ -95,7 +95,11 @@
         - alloc_array()   allocate a number of typed elements
     - The String type is always null-terminated UNLESS you take a slice of another
       string. You can use `str_to_cstr` or `str_copy` to get a null-terminated version.
-    - You can print Strings with `print("string: " stok, sfmt(the_string));`
+    - You can print Strings with `print(stok, sfmt(the_string));`
+        - stok   expands to "`%.*s`"
+        - sfmt   expands to (int)str.len, (const char*)str.data
+
+
 
     # Version history
 
