@@ -1,108 +1,127 @@
-/*
- * cba.h | v0.1.0 | https://github.com/jamiegibney/cba.h
- *
- * STB-style header library for building C/C++ projects and general C utilities.
- *
- *
- *
- * # Usage
- *
- * In ONE place in your project, define `CBA_IMPLEMENTATION` before including this header:
- *
- * #define CBA_IMPLEMENTATION
- * #include "cba.h"
- *
- * Otherwise, including this header will only include its definitions.
- *
- * You can also define `CBA_VERBOSE` to get logging when, e.g., internal commands fail:
- *
- * #define CBA_VERBOSE
- * #define CBA_IMPLEMENTATION
- * #include "cba.h"
- *
- * And, to see a message when bootstrapping, you can define `CBA_PRINT_ON_BOOTSTRAP`:
- *
- * #define CBA_PRINT_ON_BOOTSTRAP
- * #define CBA_IMPLEMENATION
- * #include "cba.h"
- *
- *
- *
- * # Example
- *
- * #define CBA_IMPLEMENTATION
- * #include "cba.h"
- *
- * int main(int argc, char** argv) {
- *     CBA_BOOTSTRAP(argc, argv);
- *
- *     assert(try_mkdir("build"), "failed to create build directory");
- *
- *     Command cmd = {0};
- *     cmd_append(&cmd,
- *         CBA_C_COMPILER,
- *         CBA_COMPILER_DEBUG_FLAGS,
- *         CBA_COMPILER_COMMON_FLAGS,
- *         CBA_COMPILER_OUTPUT("build/main"),
- *         CBA_COMPILER_INPUTS("main.c"),
- *     );
- *
- *     cmd_run(cmd);
- *
- *     return 0;
- * }
- *
- *
- *
- * # Overrideable defines
- *
- * - `CBA_BOOTSTRAP_COMMAND`: command to use for bootstrapping.
- * - `CBA_BOOTSTRAP_MESSAGE`: formatting for bootstrap message.
- * - `CBA_[INFO/WARN/ERROR]_PREFIX`: prefix to use for a log macro.
- * - `CBA_MEMORY_BLOCK_SIZE`: number of bytes to allocate to the global arena.
- * - `CBA_STRING_MIN_CAPACITY`: minimum number of bytes to allocate to strings.
- * - `CBA_ARRAY_COUNT`: number of elements allocated to array types, like `StringArray` and `Command`.
- *
- *
- *
- * # Version history
- *
- * - v0.1.0 (11 Apr 2026) (by @jamiegibney)
- *   - initial release
- *
- *
- *
- * # License
- * ------------------------------------------------------------------------------
- * MIT License
- * 
- * Copyright (c) 2026 Jamie Gibney
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- * ------------------------------------------------------------------------------
- */
+/*  
+    cba.h | v0.1.0 | https://github.com/jamiegibney/cba.h
+  
+    STB-style header library for build recipes and general utilities in C.
+
+
+  
+    # Usage
+
+    Add #define CBA_IMPLEMENTATION before including this file in ONE C/C++ file to
+    generate the implementation:
+
+    #include ...
+    #include ...
+    #define CBA_IMPLEMENTATION
+    #include "cba.h"
+
+    You can also #define CBA_VERBOSE before the include to see internal logging.
+    And #define CBA_PRINT_ON_BOOTSTRAP to see a message when the program rebuilds itself.
+  
+
+
+    # Simple example
+  
+    ```c
+    #define CBA_IMPLEMENTATION
+    #include "cba.h"
+  
+    int main(int argc, char** argv) {
+        // Allow the program to rebuild itself when modified.
+        CBA_BOOTSTRAP(argc, argv);
+
+        // Optionally create a directory.
+        assert(try_mkdir("build"), "failed to create build directory");
+
+        // A command is an array of arguments, which later can be run via the shell.
+        Command cmd = {0};
+
+        // Use CBA_... macros for compiler-specific flags.
+        cmd_append(&cmd,
+            CBA_C_COMPILER,
+            CBA_COMPILER_DEBUG_FLAGS,
+            CBA_COMPILER_COMMON_FLAGS,
+            CBA_COMPILER_OUTPUT("build/main"),
+            CBA_COMPILER_INPUTS("main.c"),
+        );
+
+        // With GCC, the above creates:
+        // `gcc -ggdb -DDEBUG -Wall -Wextra -o build/main main.c`
+        // And with MSVC:
+        // `cl.exe /ZI /DDEBUG /W4 /nologo /Fe:build/main main.c`
+
+        // Run the command, block until it terminates, and assert that it exits normally.
+        cmd_run(cmd);
+
+        return 0;
+    }
+    ```
+
+
+
+    # Overrideable defines
+
+    Before including this file, #define any of the below to override them.
+  
+    - CBA_BOOTSTRAP_COMMAND          the command to use for bootstrapping
+    - CBA_BOOTSTRAP_MESSAGE          formatted message printed when bootstrapping
+    - CBA_[INFO/WARN/ERROR]_PREFIX   prefix to use for info/warn/error macros
+    - CBA_MEMORY_BLOCK_SIZE          number of bytes to allocate to the global arena
+    - CBA_DEFAULT_STRING_CAPACITY    default (minimum) capacity for strings
+    - CBA_ARRAY_CAPCITY              maximum number of elements allocated to arrays
+
+
+    
+    # Notes
+
+    - cba.h does not use dynamic allocations: it uses a single global arena with a
+      fixed-size memory block. Use the following for allocations:
+        - alloc()         allocate an instance of a type
+        - alloc_bytes()   allocate a number of bytes
+        - alloc_array()   allocate a number of typed elements
+    - The String type is always null-terminated UNLESS you take a slice of another
+      string. In this case, use `str_copy` to get a null-terminated compatible copy.
+
+
+
+    # Version history
+
+    - v0.1.0 (11 Apr 2026) (by @jamiegibney)
+        - initial release
+
+
+
+    # License
+    ------------------------------------------------------------------------------
+    MIT License
+
+    Copyright (c) 2026 Jamie Gibney
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+    ------------------------------------------------------------------------------
+*/
 
 // @todo: prefixes
 
-#ifndef CBA_ARRAY_COUNT
-    #define CBA_ARRAY_COUNT (256)
-#elif CBA_ARRAY_COUNT == 0
+#ifndef CBA_ARRAY_CAPCITY
+    #define CBA_ARRAY_CAPCITY (256)
+#elif CBA_ARRAY_CAPCITY == 0
     #error array count must be greater than 0
 #endif
 
@@ -112,9 +131,9 @@
     #error memory block size must be greater than 0
 #endif
 
-#ifndef CBA_STRING_MIN_CAPACITY
-    #define CBA_STRING_MIN_CAPACITY (512)
-#elif CBA_STRING_MIN_CAPACITY == 0
+#ifndef CBA_DEFAULT_STRING_CAPACITY
+    #define CBA_DEFAULT_STRING_CAPACITY (512)
+#elif CBA_DEFAULT_STRING_CAPACITY == 0
     #error min string capacity must be greater than 0
 #endif
 
@@ -722,7 +741,7 @@ CBA_DEF i32 __proc_wait_va(usize n, ...);
 /// Clears the string (sets its length to 0), and zeroes its memory.
 CBA_DEF void str_clear(String* str);
 
-/// Allocates an empty string with a capacity of `CBA_STRING_MIN_CAPACITY` bytes.
+/// Allocates an empty string with a capacity of `CBA_DEFAULT_STRING_CAPACITY` bytes.
 CBA_DEF String str_alloc(void);
 /// Allocates an empty string with `cap` bytes.
 CBA_DEF String str_alloc_with_cap(usize cap);
@@ -1871,9 +1890,9 @@ CBA_DEF void str_clear(String* str) {
 
 CBA_DEF String str_alloc(void) {
     String result = {
-        .data = alloc_bytes(CBA_STRING_MIN_CAPACITY),
+        .data = alloc_bytes(CBA_DEFAULT_STRING_CAPACITY),
         .len = 0,
-        .cap = CBA_STRING_MIN_CAPACITY - 1,
+        .cap = CBA_DEFAULT_STRING_CAPACITY - 1,
     };
 
     return result;
@@ -1901,7 +1920,7 @@ CBA_DEF String str_sprintf(const char* fmt, ...) {
     // @jcg: in a nutshell, vsnprintf returns the length minus a null-terminator when used
     // as above, but will append a null-terminator anyway when used as below - hence the
     // cap + 1 for the allocation.
-    usize cap = max(len, CBA_STRING_MIN_CAPACITY);
+    usize cap = max(len, CBA_DEFAULT_STRING_CAPACITY);
     result.data = alloc_bytes(cap + 1);
     result.len = len;
     result.cap = cap;
@@ -1914,7 +1933,7 @@ CBA_DEF String str_sprintf(const char* fmt, ...) {
 
 CBA_DEF String str_from_cstr(const char* cstr) {
     usize len = (usize)strlen(cstr);
-    usize cap = max(len + 1, CBA_STRING_MIN_CAPACITY);
+    usize cap = max(len + 1, CBA_DEFAULT_STRING_CAPACITY);
 
     String result = {
         // @jcg: one extra byte is allocated so that the string is compatible with
@@ -1931,7 +1950,7 @@ CBA_DEF String str_from_cstr(const char* cstr) {
 }
 
 CBA_DEF String str_from_chars(char* buffer, usize count) {
-    usize cap = max(count, CBA_STRING_MIN_CAPACITY);
+    usize cap = max(count, CBA_DEFAULT_STRING_CAPACITY);
 
     String result = {
         .data = alloc_bytes(cap + 1),
@@ -2944,11 +2963,11 @@ CBA_DEF char* fmt_time(u64 nanos, u8 unit_verbosity) {
 
 CBA_DEF void str_arr_append_str(StringArray* arr, String str) {
     if (!arr->items) {
-        arr->items = alloc_array(CBA_ARRAY_COUNT, String);
+        arr->items = alloc_array(CBA_ARRAY_CAPCITY, String);
         arr->count = 0;
     }
 
-    assert(arr->count < CBA_ARRAY_COUNT,
+    assert(arr->count < CBA_ARRAY_CAPCITY,
            "tried to exceed maximum string count (current: %zu)",
            arr->count);
 
@@ -3030,11 +3049,11 @@ CBA_DEF String str_arr_flatten_to_str(StringArray arr, const char* separator) {
 
 CBA_DEF void cmd_append_str(Command* cmd, String str) {
     if (!cmd->items) {
-        cmd->items = alloc_array(CBA_ARRAY_COUNT, String);
+        cmd->items = alloc_array(CBA_ARRAY_CAPCITY, String);
         cmd->count = 0;
     }
 
-    assert(cmd->count < CBA_ARRAY_COUNT,
+    assert(cmd->count < CBA_ARRAY_CAPCITY,
            "tried to exceed maximum command count (current: %zu)",
            cmd->count);
 
