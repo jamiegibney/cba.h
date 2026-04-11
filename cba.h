@@ -406,6 +406,7 @@
     #endif
 #endif // CBA_REBUILD_COMMAND
 
+// @todo: I don't think this is always supported?
 #define unused [[maybe_unused]]
 
 // @mark: types
@@ -500,6 +501,7 @@ STATIC_ASSERT(sizeof(f64) == 8);
 #define F64_MAX     (1.7976931348623157e+308)
 #define F64_EPSILON (2.2204460492503131e-16)
 
+/// A kind of file type.
 enum FileType {
     /// The file type could not be detected.
     FILE_TYPE_UNKNOWN = 0,
@@ -514,6 +516,8 @@ enum FileType {
 };
 typedef enum FileType FileType;
 
+/// An arena allocator, used for linearly partitioning a memory block into smaller
+/// regions.
 struct Arena {
     /// Base pointer of the arena's memory block.
     u8* base;
@@ -530,11 +534,7 @@ struct Arena {
 };
 typedef struct Arena Arena;
 
-/// The approach with strings here is:
-/// - Preallocate their memory, and do not allow dynamic resizing.
-/// - Retain space for a null-terminator at the end of the string.
-/// - Prefer to use this string type over `const char*`, unless it's particularly annoying
-///   (e.g. for `file_*` functions, like `file_exists`).
+/// UTF-8 encoded string type.
 struct String {
     /// Pointer to the string's data.
     u8* data;
@@ -545,6 +545,7 @@ struct String {
 };
 typedef struct String String;
 
+/// Array of `String` elements.
 struct StringArray {
     /// Pointer to the array's data.
     String* items;
@@ -553,12 +554,18 @@ struct StringArray {
 };
 typedef struct StringArray StringArray;
 
+/// Options to provide when running a command.
 struct CommandOptions {
+    /// Optional pointer to a `String` to use for capturing the command's output.
     String* output_string;
+    /// Optional pointer to a `ProcessID` to set when the command shouldn't block
+    /// immediately. The `ProcessID` value can later be waited on via `proc_wait`.
     ProcessID* async_pid;
 };
 typedef struct CommandOptions CommandOptions;
 
+/// A specialised `StringArray` designed to represent a sequence of arguments which can be
+/// run as a shell command.
 struct Command {
     /// Pointer to the array of arguments in the command.
     String* items;
@@ -665,15 +672,15 @@ static Arena global_arena = {
     .temp_memory_pos = 0,
 };
 
-/// Allocates at least `size` bytes via the global arena, returning an address to the
+/// Allocates at least `size` bytes via the provided arena, returning an address to the
 /// resulting memory. Allocations are aligned to the system's cache line size, and are
 /// always zeroed by this function.
 ///
 /// If the arena does not have the capacity to allocate `size` bytes, an assertion will
 /// fail.
 ///
-/// See also the convenience macros:
-/// - `alloc`: allocates an instance of a type
+/// See also:
+/// - `alloc`:       allocates an instance of a type
 /// - `alloc_bytes`: allocates a number of bytes
 /// - `alloc_array`: allocates a number of typed elements
 CBA_DEF void* arena_alloc(Arena* arena, usize size);
@@ -688,15 +695,15 @@ CBA_DEF void* arena_alloc(Arena* arena, usize size);
 // @mark: files
 
 /// If any files in the `input_paths` array have been modified since the file at
-/// `output_path`, `1` is returned and `0` otherwise. If an error occurs (i.e. a
-/// filesystem error), `-1` is returned.
+/// `output_path`, `1` is returned and `0` otherwise. If an error occurs, `-1` is
+/// returned.
 CBA_DEF i32 files_needs_rebuild(String output_path, StringArray input_paths);
 /// If the file at `input_path` has been modified since the file at `output_path`, `1` is
 /// returned and `0` otherwise. If an error occurs (i.e. a filesystem error), `-1` is
 /// returned.
 CBA_DEF i32 file_needs_rebuild(String output_path, String input_path);
 
-/// Creates a file at `path`.
+/// Creates a file at `path`, returning true if the operation succeeded.
 CBA_DEF b32 file_create(const char* path);
 /// Moves the file at `path` to `new_path`, returning true if the operation succeeded.
 CBA_DEF b32 file_move(const char* path, const char* new_path);
@@ -721,12 +728,17 @@ CBA_DEF b32 file_read(const char* path, void* dest, usize bytes);
 /// Writes a number of `bytes` from the provided `memory` to the file, optionally
 /// appending to the file.
 CBA_DEF b32 file_write(const char* path, void* memory, usize bytes, b32 append);
-/// Attempts to make a directory at `path` if the directory does not already exist. The
-/// operation is recursive, so you can provide new nested directories, and they will all
-/// be created (if possible).
+/// Attempts to make a directory at `path` if the directory does not already exist.
 ///
 /// If the directory was successfully created or already exists, this function returns
 /// `true`. If an error occurred, it returns `false`.
+///
+/// The operation is recursive, so you can provide nested directories and they will
+/// all be created. For example:
+///
+/// `try_mkdir("a/b/c/d");`
+///
+/// Will create all non-existing directories.
 CBA_DEF b32 try_mkdir(const char* path);
 
 // @mark: processes
@@ -735,6 +747,9 @@ CBA_DEF b32 try_mkdir(const char* path);
 CBA_DEF void wait_ms(u64 ms);
 
 /// Returns the current time in nanoseconds.
+///
+/// You shouldn't expect values returned from this function to be relative to any time
+/// point in particular, but they are always relative to each other.
 CBA_DEF u64 nanos_now(void);
 
 /// Attempts to spawn a new process with the provided `cmd`, which will be invoked by the
@@ -754,6 +769,8 @@ CBA_DEF ProcessID proc_start(Command cmd, FileDescriptor output_fd);
 CBA_DEF i32 proc_wait(ProcessID proc);
 
 CBA_DEF i32 __proc_wait_va(usize n, ...);
+
+/// Waits on any number of `ProcessID` values.
 #define procs_wait(...) \
     __proc_wait_va((sizeof((ProcessID[]) { __VA_ARGS__ }) / sizeof(ProcessID)), __VA_ARGS__)
 
@@ -981,10 +998,14 @@ CBA_DEF char* fmt_time(u64 nanos, u8 unit_verbosity);
 CBA_DEF void str_arr_append_str(StringArray* arr, String str);
 
 CBA_DEF void __str_arr_append_va(StringArray* arr, usize n, ...);
+
+/// Appends any number of `String`s to the provided `StringArray`.
 #define str_arr_append(arr, ...)                                             \
     __str_arr_append_va((arr), (sizeof((String[]){__VA_ARGS__}) / sizeof(String)), __VA_ARGS__)
 
 CBA_DEF void __str_arr_append_cstrs_va(StringArray* arr, usize n, ...);
+
+/// Appends any number of C-strings to the provided `StringArray`.
 #define str_arr_append_cstrs(arr, ...) \
     __str_arr_append_cstrs_va((arr), (sizeof((const char*[]){__VA_ARGS__}) / sizeof(const char*)), __VA_ARGS__)
 
@@ -1007,6 +1028,7 @@ CBA_DEF void cmd_append_str(Command* cmd, String str);
 CBA_DEF void cmd_append_str_arr(Command* cmd, StringArray arr);
 
 CBA_DEF void __cmd_append_va(Command* cmd, usize n, ...);
+/// Appends any number of C-strings to the provided `Command`.
 #define cmd_append(cmd, ...)                                                   \
     __cmd_append_va((cmd), (sizeof((const char*[]) { __VA_ARGS__ }) / sizeof(const char*)), __VA_ARGS__)
 
@@ -1025,30 +1047,51 @@ CBA_DEF void cmd_reset(Command* cmd);
 /// Produces `{ "hello there", "from", "the", "split command" }`.
 CBA_DEF void cmd_append_split(Command* cmd, const char* args);
 
-/// Run the provided command with the provided options.
+/// Runs the provided command with the provided options.
+///
+/// If the command is asynchronous, this returns `true` if the process was started.
+/// Otherwise, this returns `true` if the processed exited successfully.
 ///
 /// See also `cmd_try_run`.
 CBA_DEF b32 cmd_try_run_with_opts(Command cmd, CommandOptions opts);
+
+/// Runs the provided command with default options.
+///
+/// If the command is asynchronous, this returns `true` if the process was started.
+/// Otherwise, this returns `true` if the processed exited successfully.
 #define cmd_try_run(cmd, ...) \
     cmd_try_run_with_opts((cmd), (CommandOptions) { __VA_ARGS__ })
 
+/// Runs the provided command with default options, and asserts that the command succeeds.
 #define cmd_run(cmd, ...)                                                                \
     assert(cmd_try_run_with_opts((cmd), (CommandOptions) { __VA_ARGS__ }),               \
            "failed to run command `%.*s`",                                               \
            sfmt(cmd_flatten(cmd)))
 
+/// Runs the whole `command` with the provided options.
+///
+/// Arguments surrounded by either `'` or `"` characters are treated as whole arguments.
+///
+/// If the command is asynchronous, this returns `true` if the process was started.
+/// Otherwise, this returns `true` if the processed exited successfully.
 CBA_DEF b32 cmd_try_run_direct_with_opts(const char* command, CommandOptions opts);
+
+/// Runs the whole `command` with default options.
+///
+/// Arguments surrounded by either `'` or `"` characters are treated as whole arguments.
+///
+/// If the command is asynchronous, this returns `true` if the process was started.
+/// Otherwise, this returns `true` if the processed exited successfully.
 #define cmd_try_run_direct(cmd, ...) \
     cmd_try_run_with_opts((cmd), ((CommandOptions) { __VA_ARGS__ }))
 
+/// Runs the whole `command` with default options, and asserts that the commands suceeds.
+///
+/// Arguments surrounded by either `'` or `"` characters are treated as whole arguments.
 #define cmd_run_direct(cmd, ...)                                                         \
     assert(cmd_try_run_direct_with_opts((cmd), (CommandOptions) { __VA_ARGS__ }),        \
            "failed to run command `%s`",                                                 \
            cmd)
-
-// CBA_DEF b32 __cmd_run_direct_va(usize n, ...);
-// #define cmd_run_direct(...) \
-//     __cmd_run_direct_va((sizeof((const char*[]) { __VA_ARGS__ }) / sizeof(const char*)), __VA_ARGS__)
 
 /// Concatenates all arguments in a command into a string using spaces.
 ///
