@@ -661,16 +661,10 @@ CBA_DEF void mem_swap(void* a, void* b, usize len_bytes);
 // @mark: arena
 
 /// Statically-allocated arena memory block, assigned to the global arena.
-static u8 arena_memory_block[CBA_MEMORY_BLOCK_SIZE] = {0};
+extern u8 global_arena_memory_block[CBA_MEMORY_BLOCK_SIZE];
 
 /// Global arena, used for all cba allocations.
-static Arena global_arena = {
-    .base = arena_memory_block,
-    .used = 0,
-    .capacity = CBA_MEMORY_BLOCK_SIZE,
-    .alignment = 0,
-    .temp_memory_pos = 0,
-};
+extern Arena global_arena;
 
 /// Allocates at least `size` bytes via the provided arena, returning an address to the
 /// resulting memory. Allocations are aligned to the system's cache line size, and are
@@ -1121,6 +1115,16 @@ CBA_DEF char* cmd_flatten_to_cstr_with_delims(Command cmd, char delim);
 // @mark: implementation
 
 #ifdef CBA_IMPLEMENTATION
+
+u8 global_arena_memory_block[CBA_MEMORY_BLOCK_SIZE] = {0};
+
+Arena global_arena = {
+    .base = global_arena_memory_block,
+    .used = 0,
+    .capacity = CBA_MEMORY_BLOCK_SIZE,
+    .alignment = 0,
+    .temp_memory_pos = 0,
+};
 
 #if CBA_WINDOWS
 #define CBA_WIN32_ERR_MSG_SIZE (4 << 10) // 4 KB
