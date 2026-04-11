@@ -329,7 +329,7 @@
                     __FILE_NAME__,                                                           \
                     __LINE__,                                                                \
                     ## __VA_ARGS__);                                                         \
-            exit(1);                                                                         \
+            CBA_TRAP;                                                                        \
         } (void)(0)
     
     #define panic(s, ...)                                                                    \
@@ -338,7 +338,7 @@
                 __FILE_NAME__,                                                               \
                 __LINE__,                                                                    \
                 ## __VA_ARGS__);                                                             \
-        exit(1)
+        CBA_TRAP
 
     #define info(s, ...)  printf("[\e[1;32m" CBA_INFO_PREFIX "\e[0m] " s "\n", ## __VA_ARGS__)
     #define warn(s, ...)  printf("[\e[1;33m" CBA_WARN_PREFIX "\e[0m] " s "\n", ## __VA_ARGS__)
@@ -355,7 +355,7 @@
                     __FILE_NAME__,                                                           \
                     __LINE__,                                                                \
                     ## __VA_ARGS__);                                                         \
-            exit(1);                                                                         \
+            CBA_TRAP;                                                                        \
         } (void)(0)
     
     #define panic(s, ...)                                                                    \
@@ -364,7 +364,7 @@
                 __FILE_NAME__,                                                               \
                 __LINE__,                                                                    \
                 ## __VA_ARGS__);                                                             \
-        exit(1)
+        CBA_TRAP
 
     #define info(s, ...)  printf("[" CBA_INFO_PREFIX "] " s "\n", ## __VA_ARGS__)
     #define warn(s, ...)  printf("[" CBA_WARN_PREFIX "] " s "\n", ## __VA_ARGS__)
