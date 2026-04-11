@@ -1159,7 +1159,7 @@ CBA_DEF char* win32_err_message(DWORD err) {
 }
 #endif
 
-CBA_DEF void __cba_rebuild_build(int argc, char** argv, const char* source_path, ...) {
+CBA_DEF void __cba_rebuild(int argc, char** argv, const char* source_path, ...) {
     int exit_code = 0;
 
     String binary_path = str_from_cstr(argv[0]);
