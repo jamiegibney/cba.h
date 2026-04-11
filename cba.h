@@ -1,6 +1,5 @@
 /*
- * cba.h
- * https://github.com/jamiegibney/cba.h
+ * cba.h | v0.1.0 | https://github.com/jamiegibney/cba.h
  *
  * STB-style header library for building C/C++ projects and general C utilities.
  *
@@ -63,6 +62,13 @@
  * - `CBA_MEMORY_BLOCK_SIZE`: number of bytes to allocate to the global arena.
  * - `CBA_STRING_MIN_CAPACITY`: minimum number of bytes to allocate to strings.
  * - `CBA_ARRAY_COUNT`: number of elements allocated to array types, like `StringArray` and `Command`.
+ *
+ *
+ *
+ * # Version history
+ *
+ * - v0.1.0 (11 Apr 2026) (by @jamiegibney)
+ *   - initial release
  *
  *
  *
