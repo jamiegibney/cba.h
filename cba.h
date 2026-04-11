@@ -1620,22 +1620,12 @@ CBA_DEF usize file_length(const char* path) {
 #if CBA_WINDOWS
     todo();
 #else
-    FILE* f = fopen(path, "rb");
-
-    if (f) {
-        int seek_result = fseek(f, 0, SEEK_END);
-
-        if (seek_result != 0) {
-            verbose_print("failed to seek to end of file \"%s\": %s", path, strerror(errno));
-        }
-        else {
-            result = (usize)ftell(f);
-        }
-
-        fclose(f);
+    uninit struct stat statbuf;
+    if (lstat(path, &statbuf) >= 0) {
+        result = (usize)statbuf.st_size;
     }
     else {
-        verbose_print("failed to open file \"%s\": %s", path, strerror(errno));
+        verbose_print("failed to stat file \"%s\": %s", path, strerror(errno));
     }
 #endif
 
