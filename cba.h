@@ -401,13 +401,13 @@
     typedef HANDLE FileDescriptor;
     #define INVALID_HANDLE INVALID_HANDLE_VALUE
     #define CBA_MAX_PATH MAX_PATH
-    #define CBA_PATH_SEP '\\'
+    #define CBA_PATH_SEPARATOR '\\'
 #else
     typedef int ProcessID;
     typedef int FileDescriptor;
     #define INVALID_HANDLE (-1)
     #define CBA_MAX_PATH PATH_MAX
-    #define CBA_PATH_SEP '/'
+    #define CBA_PATH_SEPARATOR '/'
 #endif
 
 typedef uint8_t   u8;
@@ -2100,7 +2100,7 @@ CBA_DEF String str_path_to_absolute(String str) {
     char* p = realpath((char*)str.data, (char*)result.data);
 
     if (!p) {
-        if ((str.len > 0) && (str.data[0] == CBA_PATH_SEP)) {
+        if ((str.len > 0) && (str.data[0] == CBA_PATH_SEPARATOR)) {
             // the path appears absolute anyway.
             str_copy_into(&result, str);
         }
@@ -2113,7 +2113,7 @@ CBA_DEF String str_path_to_absolute(String str) {
             }
             end_temp_memory();
 
-            str_append_char(&result, CBA_PATH_SEP);
+            str_append_char(&result, CBA_PATH_SEPARATOR);
             str_append_other(&result, str);
         }
     }
