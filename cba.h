@@ -36,9 +36,9 @@
         // A command is an array of arguments, which later can be run via the shell.
         Command cmd = {0};
 
-        // Use CBA_... macros for compiler-specific flags.
+        // Use the CBA_COMPILER_* macros for compiler-specific flags.
         cmd_append(&cmd,
-            CBA_C_COMPILER,
+            CBA_COMPILER_C,
             CBA_COMPILER_DEBUG_FLAGS,
             CBA_COMPILER_COMMON_FLAGS,
             CBA_COMPILER_OUTPUT("build/main"),
@@ -589,26 +589,26 @@ typedef struct Command Command;
      (((x) << 40) & 0x00ff000000000000) | (((x) << 56) & 0xff00000000000000))
 
 #if CBA_MSVC
-    #define CBA_C_COMPILER "gcc"
-    #define CBA_CPP_COMPILER "g++"
-    #define CBA_COMPILER_OUTPUT(output) "-o", output
-    #define CBA_COMPILER_COMMON_FLAGS "-Wall", "-Wextra"
-    #define CBA_COMPILER_DEBUG_FLAGS "-ggdb", "-DDEBUG"
-    #define CBA_COMPILER_RELEASE_FLAGS "-O3", "-DNDEBUG"
-#elif CBA_GCC
-    #define CBA_C_COMPILER "clang"
-    #define CBA_CPP_COMPILER "clang++"
-    #define CBA_COMPILER_OUTPUT(output) "-o", output
-    #define CBA_COMPILER_COMMON_FLAGS "-Wall", "-Wextra"
-    #define CBA_COMPILER_DEBUG_FLAGS "-glldb", "-DDEBUG"
-    #define CBA_COMPILER_RELEASE_FLAGS "-O3", "-DNDEBUG"
-#elif CBA_CLANG
-    #define CBA_C_COMPILER "cl.exe"
-    #define CBA_CPP_COMPILER "cl.exe"
+    #define CBA_COMPILER_C "cl.exe"
+    #define CBA_COMPILER_CPP "cl.exe"
     #define CBA_COMPILER_OUTPUT(output) alloc_sprintf("/Fe:%s", output)
     #define CBA_COMPILER_COMMON_FLAGS "/W4", "/nologo"
     #define CBA_COMPILER_DEBUG_FLAGS "/ZI", "/DDEBUG"
     #define CBA_COMPILER_RELEASE_FLAGS "/O3", "/DNDEBUG"
+#elif CBA_GCC
+    #define CBA_COMPILER_C "gcc"
+    #define CBA_COMPILER_CPP "g++"
+    #define CBA_COMPILER_OUTPUT(output) "-o", output
+    #define CBA_COMPILER_COMMON_FLAGS "-Wall", "-Wextra"
+    #define CBA_COMPILER_DEBUG_FLAGS "-ggdb", "-DDEBUG"
+    #define CBA_COMPILER_RELEASE_FLAGS "-O3", "-DNDEBUG"
+#elif CBA_CLANG
+    #define CBA_COMPILER_C "clang"
+    #define CBA_COMPILER_CPP "clang++"
+    #define CBA_COMPILER_OUTPUT(output) "-o", output
+    #define CBA_COMPILER_COMMON_FLAGS "-Wall", "-Wextra"
+    #define CBA_COMPILER_DEBUG_FLAGS "-glldb", "-DDEBUG"
+    #define CBA_COMPILER_RELEASE_FLAGS "-O3", "-DNDEBUG"
 #endif
 
 #define CBA_COMPILER_INPUTS(...) __VA_ARGS__

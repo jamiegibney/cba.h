@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
     Command cmd = {0};
 
     cmd_append(&cmd,
-        CBA_C_COMPILER,
+        CBA_COMPILER_C,
         CBA_COMPILER_DEBUG_FLAGS,
         CBA_COMPILER_COMMON_FLAGS,
         CBA_COMPILER_OUTPUT("build/main"),
@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
     // Or you can use compiler-specific macros
     cmd_append(&cmd,
         // e.g. "gcc" or "cl.exe"
-        CBA_C_COMPILER,
+        CBA_COMPILER_C,
         // e.g. "-o main", or "/Fe:main"
         CBA_COMPILER_OUTPUT("main"),
         CBA_COMPILER_INPUTS("main.c")
