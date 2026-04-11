@@ -91,20 +91,8 @@
         - alloc_bytes()   allocate a number of bytes
         - alloc_array()   allocate a number of typed elements
     - The String type is always null-terminated UNLESS you take a slice of another
-      string. In this case, use `str_copy` to get a null-terminated compatible copy.
-    - You can print Strings as below:
-
-    ```c
-    String s1 = str_from_cstr("Hello, world!");
-    print("the string is: " stok, sfmt(s1));
-
-    // or, e.g.
-
-    String s2 = strl("Hello, sailor!"); // directly wrap a string literal
-    print("the other string is: `%.*s`", sfmt(s));
-    ```
-
-
+      string. You can use `str_to_cstr` or `str_copy` to get a null-terminated version.
+    - You can print Strings with `print("string: " stok, sfmt(the_string));`
 
     # Version history
 
@@ -2892,12 +2880,9 @@ CBA_DEF b32 str_parse_to_f64(String str, f64* dest) {
 }
 
 CBA_DEF char* str_to_cstr(String str) {
-    assert(str.data[str.len] == 0, "string data is not null-terminated");
-
-    // u8* result = alloc_bytes(str.len + 1);
-    // memcpy(result, str.data, str.len);
-
-    return (char*)str.data;
+    char* result = alloc_array(str.len + 1, char);
+    memcpy(result, str.data, str.len);
+    return result;
 }
 
 CBA_DEF char* alloc_sprintf(const char* fmt, ...) {
