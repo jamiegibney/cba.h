@@ -9,6 +9,12 @@ The idea is chiefly based on tsoding's [nob.h
 library](https://github.com/tsoding/nob.h), but with a variety changes that I
 either prefer or which I'm experimenting with.
 
+Grab the header with:
+
+```sh
+wget https://raw.githubusercontent.com/jamiegibney/cba.h/refs/heads/master/cba.h
+```
+
 ## Usage
 
 The below file is built with any C compiler (e.g. `gcc -o cba cba.c`), and
