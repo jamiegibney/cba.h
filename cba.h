@@ -2634,11 +2634,9 @@ CBA_DEF b32 str_find_last_char(String haystack, char needle, usize* where) {
 }
 
 CBA_DEF b32 str_find_first_other(String haystack, String needle, b32 case_sensitive, usize* where) {
-    if (!haystack.len || !needle.len) return false;
-
     b32 result = false;
 
-    if (haystack.len > needle.len) {
+    if (haystack.len && needle.len && (haystack.len > needle.len)) {
         usize iters = haystack.len - needle.len;
         usize off = 0;
 
@@ -2647,7 +2645,7 @@ CBA_DEF b32 str_find_first_other(String haystack, String needle, b32 case_sensit
 
             for (usize i = 0; i < needle.len; ++i) {
                 u8 a = haystack.data[off + i];
-                u8 b = needle.data[off];
+                u8 b = needle.data[i];
 
                 if (case_sensitive || !is_alpha(a) || !is_alpha(b)) {
                     mismatch = a != b;
