@@ -3463,25 +3463,23 @@ CBA_DEF String cmd_flatten_with_delims(Command cmd, char delim) {
         capacity += cmd.items[i].cap + 3; 
     }
 
-    result.data = alloc_bytes(capacity);
-    result.cap = capacity;
+    result = str_alloc_with_cap(capacity);
 
     for (usize i = 0; i < cmd.count; ++i) {
-        String* item = &cmd.items[i];
+        String* arg = &cmd.items[i];
+        assert(arg->len, "argument should not be empty");
 
-        if (item->len) {
-            if (i != 0) {
-                str_append_char(&result, ' ');
-            }
+        if (i != 0) {
+            str_append_char(&result, ' ');
+        }
 
-            if (!str_find_first_char(*item, ' ', NULL)) {
-                str_append_other(&result, *item);
-            }
-            else {
-                str_append_char(&result, delim);
-                str_append_other(&result, *item);
-                str_append_char(&result, delim);
-            }
+        if (!str_find_first_char(*arg, ' ', NULL)) {
+            str_append_other(&result, *arg);
+        }
+        else {
+            str_append_char(&result, delim);
+            str_append_other(&result, *arg);
+            str_append_char(&result, delim);
         }
     }
 
