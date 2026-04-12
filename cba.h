@@ -1752,8 +1752,6 @@ CBA_INLINE b32 _mkdir(const char* path) {
 CBA_DEF b32 try_mkdir(const char* path) {
     b32 result = false;
 
-    // @todo: assert path is a directory?
-
 #if CBA_WINDOWS
     todo();
 #else
@@ -2891,7 +2889,7 @@ CBA_DEF b32 str_parse_to_i64(String str, i64* dest) {
 }
 
 CBA_DEF b32 str_parse_to_f64(String str, f64* dest) {
-    // @todo: parsing for inf/NaN?
+    // @todo: parsing for inf/nan
     b32 result = true;
 
     f64 sign = 1.0;
