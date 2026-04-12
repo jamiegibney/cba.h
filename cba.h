@@ -18,7 +18,7 @@
     Before the include, you can also add:
 
     #define CBA_VERBOSE            to see internal logging (e.g. for errors)
-    #define CBA_NO_COLOR_OUTPUT    to prevent coloured output
+    #define CBA_NO_COLOR_OUTPUT    to prevent coloured output (ANSI escape codes)
     #define CBA_PRINT_ON_REBUILD   to see messages when a program rebuilds itself
 
     All functions in this header are documented via comments above their definitions.
