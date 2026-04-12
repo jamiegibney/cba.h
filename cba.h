@@ -242,6 +242,9 @@
     #else
         #define CBA_TRAP __debugbreak()
     #endif
+
+    // @todo: check that this works correctly.
+    #define CBA_UNUSED [[maybe_unused]]
 #else
     #if defined(__MINGW_PRINTF_FORMAT)
         #define PRINTF_FORMAT(STRING_INDEX, FIRST_TO_CHECK) __attribute__ ((format (__MINGW_PRINTF_FORMAT, STRING_INDEX, FIRST_TO_CHECK)))
@@ -254,6 +257,9 @@
     #define CBA_FALLTHROUGH [[fallthrough]]
     #define CBA_UNREACHABLE __builtin_unreachable()
     #define CBA_TRAP __builtin_trap()
+
+    // @todo: check that this works correctly
+    #define CBA_UNUSED __attribute__((unused))
 #endif
 
 #if CBA_MSVC
@@ -372,9 +378,6 @@
     #else
     #endif
 #endif // CBA_REBUILD_COMMAND
-
-// @todo: I don't think this is always supported?
-#define unused [[maybe_unused]]
 
 // @mark: types
 
