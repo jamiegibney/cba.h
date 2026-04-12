@@ -701,8 +701,12 @@ CBA_DEF i32 file_needs_rebuild(String output_path, String input_path);
 /// Creates a file at `path`, returning true if the operation succeeded.
 CBA_DEF b32 file_create(const char* path);
 /// Moves the file at `path` to `new_path`, returning true if the operation succeeded.
+///
+/// If a file exists at the `new_path`, the file will be overwritten.
 CBA_DEF b32 file_move(const char* path, const char* new_path);
 /// Copies the file at `path` to `new_path`, returning true if the operation succeeded.
+///
+/// If a file exists at the `new_path`, the file will be overwritten.
 ///
 /// On Unix systems, `symbolic_link` will make `new_path` a symbolic link to the file at
 /// `path`. On Windows, setting `symbolic_link` to `true` will have no effect.
@@ -761,6 +765,8 @@ CBA_DEF ProcessID proc_start(Command cmd, FileDescriptor output_fd);
 /// - `-1`: the process could not be waited on
 /// - `0`: the process returned a non-zero exit code, or was terminated by a signal
 /// - `1`: the process exited normally
+///
+/// The provided `ProcessID` cannot be `INVALID_HANDLE`.
 CBA_DEF i32 proc_wait(ProcessID proc);
 
 CBA_DEF i32 __proc_wait_va(usize n, ...);
@@ -1079,11 +1085,11 @@ CBA_DEF b32 cmd_try_run_with_opts(Command cmd, CommandOptions opts);
 /// If the command is asynchronous, this returns `true` if the process was started.
 /// Otherwise, this returns `true` if the processed exited successfully.
 #define cmd_try_run(cmd, ...) \
-    cmd_try_run_with_opts((cmd), (CommandOptions) { __VA_ARGS__ })
+    cmd_try_run_with_opts((cmd), CBA_LITERAL(CommandOptions) { __VA_ARGS__ })
 
 /// Runs the provided command with default options, and asserts that the command succeeds.
 #define cmd_run(cmd, ...)                                                                \
-    assert(cmd_try_run_with_opts((cmd), (CommandOptions) { __VA_ARGS__ }),               \
+    assert(cmd_try_run_with_opts((cmd), CBA_LITERAL(CommandOptions) { __VA_ARGS__ }),    \
            "failed to run command `%.*s`",                                               \
            sfmt(cmd_flatten(cmd)))
 
@@ -1102,13 +1108,13 @@ CBA_DEF b32 cmd_try_run_direct_with_opts(const char* command, CommandOptions opt
 /// If the command is asynchronous, this returns `true` if the process was started.
 /// Otherwise, this returns `true` if the processed exited successfully.
 #define cmd_try_run_direct(cmd, ...) \
-    cmd_try_run_with_opts((cmd), ((CommandOptions) { __VA_ARGS__ }))
+    cmd_try_run_with_opts((cmd), CBA_LITERAL(CommandOptions) { __VA_ARGS__ })
 
 /// Runs the whole `command` with default options, and asserts that the commands suceeds.
 ///
 /// Arguments surrounded by either `'` or `"` characters are treated as whole arguments.
 #define cmd_run_direct(cmd, ...)                                                         \
-    assert(cmd_try_run_direct_with_opts((cmd), (CommandOptions) { __VA_ARGS__ }),        \
+    assert(cmd_try_run_direct_with_opts((cmd), CBA_LITERAL(CommandOptions) { __VA_ARGS__ }),        \
            "failed to run command `%s`",                                                 \
            cmd)
 
