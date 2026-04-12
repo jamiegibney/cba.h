@@ -1185,11 +1185,17 @@ static inline const char* _os_error() {
 
 CBA_DEF void __cba_rebuild(int argc, char** argv, const char* source_path, ...) {
     u64 start_ns = nanos_now();
+    CBA_UNUSED(start_ns);
 
     int exit_code = 0;
 
     String binary_path = str_from_cstr(argv[0]);
-    const char* binary_path_cstr = (char*)binary_path.data;
+
+#if CBA_WINDOWS
+    if (str_starts_with(binary_path, ".\\")) {
+        str_lshift(&binary_path, 2, 2);
+    }
+#endif
 
 #if CBA_WINDOWS
     if (!str_ends_with(binary_path, ".exe")) {
@@ -1197,11 +1203,23 @@ CBA_DEF void __cba_rebuild(int argc, char** argv, const char* source_path, ...) 
     }
 #endif
 
+    String old_binary_path = str_copy(binary_path);
+    str_append_cstr(&old_binary_path, ".bak");
+    
+    const char* binary_path_cstr = (char*)binary_path.data;
+    const char* old_binary_path_cstr = (char*)old_binary_path.data;
+
+    // @jcg: try to remove a previously backed-up executable. It doesn't really matter if
+    // it fails - this just helps to keep the file tree a little cleaner.
+    if (file_exists(old_binary_path_cstr)) {
+        file_delete(old_binary_path_cstr);
+    }
+
     StringArray source_paths = {0};
     str_arr_append_cstrs(&source_paths, source_path);
 
-    // @jcg: if this header is found in the root directory then it too can be watched -
-    // particularly useful when developing cba in its own repository.
+    // @jcg: if this header is found in the root directory then it too can be watched,
+    // which is particularly useful when developing cba in its own repository.
     if (file_exists("cba.h")) {
         str_arr_append_cstrs(&source_paths, "cba.h");
     }
@@ -1216,22 +1234,24 @@ CBA_DEF void __cba_rebuild(int argc, char** argv, const char* source_path, ...) 
     }
     va_end(args);
 
-    i32 rebuild_needed = files_needs_rebuild(binary_path, source_paths);
+    i32 rebuild_needed = files_need_rebuild(binary_path, source_paths);
 
     if (rebuild_needed == -1) {
         exit_code = 1;
     }
     else if (rebuild_needed == 1) {
         Command cmd = {0};
-        String old_binary_path = str_sprintf("%.*s.bak", sfmt(binary_path));
 
-        const char* old_binary_path_cstr = (char*)old_binary_path.data;
+        // @jcg: a backup of the previous executable has to be created in case the rebuild
+        // fails. Ideally it'd be removed after a successful rebuild, but the file can't
+        // be deleted while mapped to memory on all operating systems. This function tries
+        // to remove the backed up file when the program is next run, but it can't remove
+        // it before then.
 
         if (file_move(binary_path_cstr, old_binary_path_cstr)) {
             cmd_append(&cmd, CBA_REBUILD_COMMAND(argv[0], source_path));
 
             b32 success = cmd_try_run(cmd);
-            cmd_reset(&cmd);
 
             if (success) {
 #if defined(CBA_PRINT_ON_REBUILD) || defined(CBA_VERBOSE)
@@ -1241,12 +1261,13 @@ CBA_DEF void __cba_rebuild(int argc, char** argv, const char* source_path, ...) 
 #endif
 
                 // re-run the previous command with the new binary.
-                StringArray args = str_arr_from_cstr_arr(argv + 1, (usize)(argc - 1));
-                cmd_append_str(&cmd, binary_path);
-                cmd_append_str_arr(&cmd, args);
+                StringArray cmd_args = str_arr_from_cstr_arr(argv + 1, (usize)(argc - 1));
 
-                b32 success = cmd_try_run(cmd);
                 cmd_reset(&cmd);
+                cmd_append_str(&cmd, binary_path);
+                cmd_append_str_arr(&cmd, cmd_args);
+
+                success = cmd_try_run(cmd);
 
                 if (!success) {
                     exit_code = 1;
@@ -1322,13 +1343,13 @@ static inline FileDescriptor _open_fd_for_read_write(const char* path) {
     attr.nLength = sizeof(SECURITY_ATTRIBUTES);
     attr.bInheritHandle = TRUE;
 
-    HANDLE fd = CreateFile(path, GENERIC_WRITE | GENERIC_READ, 0, &attr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE fd = CreateFileA(path, GENERIC_WRITE | GENERIC_READ, 0, &attr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
     if (fd != INVALID_HANDLE) {
         result = (FileDescriptor)fd;
     }
     else {
-        verbose_print("failed to open file descriptor for \"%s\": %s", path, win32_err_message(GetLastError()));
+        verbose_print("failed to open file descriptor for \"%s\": %s", path, _os_error());
     }
 #else
     int fd = open(path, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
@@ -1337,7 +1358,7 @@ static inline FileDescriptor _open_fd_for_read_write(const char* path) {
         result = (FileDescriptor)fd;
     }
     else {
-        verbose_print("failed to open file descriptor for \"%s\": %s", path, strerror(errno));
+        verbose_print("failed to open file descriptor for \"%s\": %s", path, _os_error());
     }
 #endif
 
@@ -1352,7 +1373,42 @@ static inline void _close_fd(FileDescriptor fd) {
 #endif
 }
 
-CBA_DEF i32 files_needs_rebuild(String output_path, StringArray input_paths) {
+static usize _seek_fd(FileDescriptor fd, b32 end) {
+    usize result = 0;
+
+    assert(fd != INVALID_HANDLE, "cannot seek with an invalid file descriptor");
+
+#if CBA_WINDOWS
+    DWORD pos = SetFilePointer(fd, 0, NULL, end ? FILE_END : FILE_BEGIN);
+    assert(pos != INVALID_SET_FILE_POINTER, "failed to seek file");
+#else
+    result = (usize)lseek(output_fd, 0, end ? SEEK_END : SEEK_SET);
+#endif
+
+    return result;
+}
+
+static isize _read_fd(FileDescriptor fd, void* memory, usize bytes) {
+    isize result = 0;
+
+#if CBA_WINDOWS
+    uninit DWORD bytes_read;
+    b32 success = ReadFile(fd, memory, (DWORD)bytes, &bytes_read, NULL);
+
+    if (success) {
+        result = (isize)bytes_read;
+    }
+    else {
+        result = -1;
+    }
+#else
+    result = (isize)read(fd, memory, bytes);
+#endif
+
+    return result;
+}
+
+CBA_DEF i32 files_need_rebuild(String output_path, StringArray input_paths) {
     i32 result = 0;
 
 #if CBA_WINDOWS
@@ -1360,7 +1416,7 @@ CBA_DEF i32 files_needs_rebuild(String output_path, StringArray input_paths) {
 
     char* output_path_cstr = str_to_cstr(output_path);
 
-    HANDLE output_path_fd = CreateFile(output_path_cstr, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY, NULL);
+    HANDLE output_path_fd = CreateFileA(output_path_cstr, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY, NULL);
 
     if (output_path_fd != INVALID_HANDLE_VALUE) {
         uninit FILETIME output_path_time;
@@ -1378,7 +1434,7 @@ CBA_DEF i32 files_needs_rebuild(String output_path, StringArray input_paths) {
                 char* input_path_cstr = str_to_cstr(input_paths.items[i]);
                 end_temp_memory();
 
-                HANDLE input_path_fd = CreateFile(input_path_cstr, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY, NULL);
+                HANDLE input_path_fd = CreateFileA(input_path_cstr, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY, NULL);
 
                 if (input_path_fd != INVALID_HANDLE_VALUE) {
                     uninit FILETIME input_path_time;
@@ -1392,18 +1448,18 @@ CBA_DEF i32 files_needs_rebuild(String output_path, StringArray input_paths) {
                         }
                     }
                     else {
-                        verbose_print("failed to stat input file \"%s\": %s", input_path_cstr, win32_err_message(GetLastError()));
+                        verbose_print("failed to stat input file \"%s\": %s", input_path_cstr, _os_error());
                         result = -1;
                     }
                 }
                 else {
-                    verbose_print("failed to open input file \"%s\": %s", input_path_cstr, win32_err_message(GetLastError()));
+                    verbose_print("failed to open input file \"%s\": %s", input_path_cstr, _os_error());
                     result = -1;
                 }
             }
         }
         else {
-            verbose_print("failed to stat output file \"%s\": %s", output_path_cstr, win32_err_message(GetLastError()));
+            verbose_print("failed to stat output file \"%s\": %s", output_path_cstr, _os_error());
             result = -1;
         }
     }
@@ -1412,7 +1468,7 @@ CBA_DEF i32 files_needs_rebuild(String output_path, StringArray input_paths) {
             result = 1;
         }
         else {
-            verbose_print("failed to open output file \"%s\": %s", output_path_cstr, win32_err_message(GetLastError()));
+            verbose_print("failed to open output file \"%s\": %s", output_path_cstr, _os_error());
             result = -1;
         }
     }
@@ -1439,7 +1495,7 @@ CBA_DEF i32 files_needs_rebuild(String output_path, StringArray input_paths) {
                 }
             }
             else {
-                verbose_print("failed to stat input file \"%s\": %s", input_path_cstr, strerror(errno));
+                verbose_print("failed to stat input file \"%s\": %s", input_path_cstr, _os_error());
                 result = -1;
             }
         }
@@ -1449,7 +1505,7 @@ CBA_DEF i32 files_needs_rebuild(String output_path, StringArray input_paths) {
             result = 1;
         }
         else {
-            verbose_print("failed to stat output file \"%s\": %s", output_path_cstr, strerror(errno));
+            verbose_print("failed to stat output file \"%s\": %s", output_path_cstr, _os_error());
             result = -1;
         }
     }
@@ -1468,7 +1524,7 @@ CBA_DEF i32 file_needs_rebuild(String output_path, String input_path) {
     StringArray arr = {0};
     str_arr_append_str(&arr, input_path);
 
-    result = files_needs_rebuild(output_path, arr);
+    result = files_need_rebuild(output_path, arr);
 
     end_temp_memory();
 
@@ -1478,9 +1534,6 @@ CBA_DEF i32 file_needs_rebuild(String output_path, String input_path) {
 CBA_DEF b32 file_create(const char* path) {
     b32 result = false;
 
-#if CBA_WINDOWS
-    todo();
-#else
     FILE* f = fopen(path, "w+");
 
     if (f) {
@@ -1488,9 +1541,8 @@ CBA_DEF b32 file_create(const char* path) {
         fclose(f);
     }
     else {
-        verbose_print("failed to open file \"%s\": %s", path, strerror(errno));
+        verbose_print("failed to open file \"%s\": %s", path, _os_error());
     }
-#endif
 
     return result;
 }
@@ -1499,14 +1551,17 @@ CBA_DEF b32 file_move(const char* path, const char* new_path) {
     b32 result = false;
 
 #if CBA_WINDOWS
-    todo();
+    // @todo: this will replace existing files at the new path. Does the rename function
+    // below do the same? I'd imagine that is the preferred behaviour (which should be
+    // documented if so), because the user can always check if there's a file existing there.
+    result = MoveFileExA(path, new_path, MOVEFILE_REPLACE_EXISTING);
 #else
     result = rename(path, new_path) == 0;
+#endif
 
     if (!result) {
-        verbose_print("failed to rename \"%s\" to \"%s\": %s", path, new_path, strerror(errno));
+        verbose_print("failed to rename \"%s\" to \"%s\": %s", path, new_path, _os_error());
     }
-#endif
 
     return result;
 }
@@ -1515,7 +1570,11 @@ CBA_DEF b32 file_copy(const char* path, const char* new_path, b32 symbolic_link)
     b32 result = false;
 
 #if CBA_WINDOWS
-    todo();
+    result = CopyFileA(path, new_path, FALSE);
+
+    if (symbolic_link) {
+        verbose_print("warning: cannot create symbolic links on windows!");
+    }
 #elif CBA_MACOS
     if (symbolic_link) {
         result = symlink(path, new_path) == 0;
@@ -1550,19 +1609,21 @@ CBA_DEF b32 file_copy(const char* path, const char* new_path, b32 symbolic_link)
     end_temp_memory();
 #endif
 
+    if (!result) {
+        verbose_print("failed to copy file \"%s\" to \"%s\": %s", path, new_path, _os_error());
+    }
+
     return result;
 }
 
 #if !CBA_WINDOWS
 static inline int _rment(const char* path, const struct stat* st, int flags, struct FTW* ftwp) {
-    (void)st;
-    (void)flags;
-    (void)ftwp;
+    CBA_UNUSED(st); CBA_UNUSED(flags); CBA_UNUSED(ftwp);
 
     int result = remove(path);
         
     if (result != 0) {
-        verbose_print("failed to remove directory entry \"%s\": %s", path, strerror(errno));
+        verbose_print("failed to remove directory entry \"%s\": %s", path, _os_error());
     }
 
     return result;
@@ -1573,7 +1634,32 @@ CBA_DEF b32 file_delete(const char* path) {
     b32 result = false;
 
 #if CBA_WINDOWS
-    todo();
+    if (file_exists(path)) {
+        FileKind kind = file_get_kind(path);
+
+        switch (kind) {
+            case FILE_KIND_DIRECTORY: {
+                // @todo: does this work recursively?
+                result = RemoveDirectoryA(path);
+
+                if (!result) {
+                    verbose_print("failed to delete directory \"%s\": %s", path, _os_error());
+                }
+            } break;
+
+            case FILE_KIND_REGULAR:
+            case FILE_KIND_SYMLINK:
+            case FILE_KIND_OTHER: {
+                result = DeleteFileA(path);
+
+                if (!result) {
+                    verbose_print("failed to delete file \"%s\": %s", path, _os_error());
+                }
+            } break;
+
+            default: break;
+        }
+    }
 #else
     if (file_exists(path)) {
         FileKind ft = file_get_kind(path);
@@ -1587,7 +1673,7 @@ CBA_DEF b32 file_delete(const char* path) {
                 result = true;
             }
             else {
-                verbose_print("failed to recursively delete \"%s\": %s", path, strerror(errno));
+                verbose_print("failed to recursively delete \"%s\": %s", path, _os_error());
             }
         } 
         else {
@@ -1597,7 +1683,7 @@ CBA_DEF b32 file_delete(const char* path) {
                 result = true;
             }
             else {
-                verbose_print("failed to delete \"%s\": %s", path, strerror(errno));
+                verbose_print("failed to delete \"%s\": %s", path, _os_error());
             }
         }
     }
@@ -1613,7 +1699,7 @@ CBA_DEF b32 file_exists(const char* path) {
     b32 result = false;
 
 #if CBA_WINDOWS
-    todo();
+    result = GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
 #else
     result = access(path, F_OK) == 0;
 #endif
@@ -1625,7 +1711,13 @@ CBA_DEF FileKind file_get_kind(const char* path) {
     FileKind result = FILE_KIND_UNKNOWN;
 
 #if CBA_WINDOWS
-    todo();
+    DWORD attributes = GetFileAttributesA(path);
+    if (attributes != INVALID_FILE_ATTRIBUTES) {
+        result = (attributes & FILE_ATTRIBUTE_DIRECTORY) ? FILE_KIND_DIRECTORY : FILE_KIND_REGULAR;
+    }
+    else {
+        verbose_print("failed to get file attributes for \"%s\": %s", path, _os_error());
+    }
 #else
     uninit struct stat statbuf;
     if (lstat(path, &statbuf) >= 0) {
@@ -1643,7 +1735,7 @@ CBA_DEF FileKind file_get_kind(const char* path) {
         }
     }
     else {
-        verbose_print("failed to stat file \"%s\": %s", path, strerror(errno));
+        verbose_print("failed to stat file \"%s\": %s", path, _os_error());
     }
 #endif
 
@@ -1654,14 +1746,24 @@ CBA_DEF usize file_length(const char* path) {
     usize result = 0;
 
 #if CBA_WINDOWS
-    todo();
+    uninit WIN32_FILE_ATTRIBUTE_DATA attribute_data;
+    if (GetFileAttributesExA(path, GetFileExInfoStandard, &attribute_data)) {
+#if CBA_64_BIT
+        result = ((usize)attribute_data.nFileSizeHigh << 32) | attribute_data.nFileSizeLow;
+#else
+        result = attribute_data.nFileSizeLow;
+#endif
+    }
+    else {
+        verbose_print("failed to get file attributes for \"%s\": %s", path, _os_error());
+    }
 #else
     uninit struct stat statbuf;
     if (lstat(path, &statbuf) >= 0) {
         result = (usize)statbuf.st_size;
     }
     else {
-        verbose_print("failed to stat file \"%s\": %s", path, strerror(errno));
+        verbose_print("failed to stat file \"%s\": %s", path, _os_error());
     }
 #endif
 
@@ -1674,16 +1776,13 @@ CBA_DEF b32 file_read(const char* path, void* dest, usize bytes) {
     assert(dest, "cannot read to NULL memory");
     assert(bytes, "cannot read zero bytes");
 
-#if CBA_WINDOWS
-    todo();
-#else
     FILE* f = fopen(path, "rb");
 
     if (f) {
         usize bytes_read = fread(dest, 1, bytes, f);
 
         if (bytes_read == 0) {
-            verbose_print("failed to read any memory from \"%s\": %s", path, strerror(errno));
+            verbose_print("failed to read any memory from \"%s\": %s", path, _os_error());
         }
         else {
             result = true;
@@ -1692,9 +1791,8 @@ CBA_DEF b32 file_read(const char* path, void* dest, usize bytes) {
         fclose(f);
     }
     else {
-        verbose_print("failed to open file \"%s\": %s", path, strerror(errno));
+        verbose_print("failed to open file \"%s\": %s", path, _os_error());
     }
-#endif
 
     return result;
 }
@@ -1705,9 +1803,6 @@ CBA_DEF b32 file_write(const char* path, void* memory, usize bytes, b32 append) 
     assert(memory, "cannot write from NULL memory");
     assert(bytes, "cannot write zero bytes");
 
-#if CBA_WINDOWS
-    todo();
-#else
     uninit FILE* f;
     if (append) {
         f = fopen(path, "wb");
@@ -1720,7 +1815,7 @@ CBA_DEF b32 file_write(const char* path, void* memory, usize bytes, b32 append) 
         usize bytes_written = fwrite(memory, 1, bytes, f);
 
         if (!bytes_written && !feof(f)) {
-            verbose_print("failed to write memory to \"%s\": %s", path, strerror(errno));
+            verbose_print("failed to write memory to \"%s\": %s", path, _os_error());
         }
         else {
             result = true;
@@ -1729,23 +1824,37 @@ CBA_DEF b32 file_write(const char* path, void* memory, usize bytes, b32 append) 
         fclose(f);
     }
     else {
-        verbose_print("failed to open file \"%s\": %s", path, strerror(errno));
+        verbose_print("failed to open file \"%s\": %s", path, _os_error());
     }
-#endif
 
     return result;
 }
 
-#if !CBA_WINDOWS
-CBA_INLINE b32 _mkdir(const char* path) {
+#if CBA_WINDOWS
+CBA_INLINE b32 _create_dir(const char* path) {
     b32 result = true;
 
     if (!file_exists(path)) {
-        int res = mkdir(path, 0755);
+        result = _mkdir(path) == 0;
+
+        if (!result) {
+            verbose_print("failed to create directory \"%s\": %s", path, _os_error());
+        }
+    }
+
+    return result;
+}
+#else
+CBA_INLINE b32 _create_dir(const char* path) {
+    b32 result = true;
+
+    if (!file_exists(path)) {
+        // @todo: does this function not return 0 on success?
+        b32 res = mkdir(path, 0755);
 
         if (res < 0) {
             assert(errno != EEXIST, "the file should not exist, because it has already been checked");
-            verbose_print("failed to create directory \"%s\": %s", path, strerror(errno));
+            verbose_print("failed to create directory \"%s\": %s", path, _os_error());
             result = false;
         }
     }
@@ -1755,11 +1864,8 @@ CBA_INLINE b32 _mkdir(const char* path) {
 #endif
 
 CBA_DEF b32 try_mkdir(const char* path) {
-    b32 result = false;
+    b32 result = true;
 
-#if CBA_WINDOWS
-    todo();
-#else
     begin_temp_memory();
     {
         String path_str = str_from_cstr(path);
@@ -1768,16 +1874,19 @@ CBA_DEF b32 try_mkdir(const char* path) {
             StringArray parent_paths = str_to_parent_paths(path_str);
 
             if (parent_paths.items) {
-                result = true;
-
                 for (usize i = 0; i < parent_paths.count; ++i) {
                     char* path_cstr = (char*)str_to_cstr(parent_paths.items[i]);
-                    _mkdir(path_cstr);
+                    if (!_create_dir(path_cstr)) {
+                        result = false;
+                        break;
+                    }
                 }
 
                 // @jcg: the above only creates parent paths: the top-level dir still needs to
                 // be created.
-                _mkdir((char*)path);
+                if (result && !_create_dir((char*)path)) {
+                    result = false;
+                }
             }
         }
         else {
@@ -1786,7 +1895,6 @@ CBA_DEF b32 try_mkdir(const char* path) {
         }
     }
     end_temp_memory();
-#endif
 
     return result;
 }
@@ -1799,12 +1907,10 @@ CBA_DEF b32 try_mkdir(const char* path) {
 
 CBA_DEF void wait_ms(u64 ms) {
 #if CBA_WINDOWS
-    Sleep(ms);
+    Sleep((DWORD)ms);
 #else
     u64 secs = ms / 1000;
     u64 nanos = (ms - (secs * 1000)) * 1000000;
-
-    print("%llu | %llu | %llu", ms, secs, nanos);
 
     struct timespec duration = {
         .tv_sec  = (long)secs,
@@ -1819,7 +1925,11 @@ CBA_DEF u64 nanos_now(void) {
     u64 result = 0;
 
 #if CBA_WINDOWS
-    todo();
+    uninit LARGE_INTEGER freq, counter;
+    assert(QueryPerformanceFrequency(&freq), "failed to obtain performance counter frequency");
+    assert(QueryPerformanceCounter(&counter), "failed to obtain performance counter");
+
+    result = counter.QuadPart * (1000000000 / freq.QuadPart);
 #else
     result = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
 #endif
@@ -1827,11 +1937,108 @@ CBA_DEF u64 nanos_now(void) {
     return result;
 }
 
+#if CBA_WINDOWS
+// @jcg: windows needs some specific escaping of backslashes and quotes:
+// https://learn.microsoft.com/en-gb/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way
+static inline String _cmd_flatten_win32(Command cmd) {
+    String result = {0};
+
+    usize capacity = 1;
+
+    for (usize i = 0; i < cmd.count; ++i) {
+        capacity += cmd.items[i].cap; 
+    }
+
+    // @jcg: it's hard to know without counting how many backslashes there might be, so
+    // it's easier to just double the minimum capacity.
+    // @todo: perhaps actually counting so this never runs out of capacity would be wise?
+    result = str_alloc_with_cap(capacity * 2);
+
+    for (usize i = 0; i < cmd.count; ++i) {
+        String* arg = &cmd.items[i];
+        assert(arg->len, "argument should not be empty");
+
+        if (i != 0) {
+            str_append_char(&result, ' ');
+        }
+
+        if (str_find_first_of_any_in_cstr(*arg, " \t\n\v\"", true, NULL)) {
+            usize backslashes = 0;
+            str_append_char(&result, '\"');
+
+            for (usize ii = 0; ii < arg->len; ++ii) {
+                char ch = arg->data[ii];
+
+                if (ch == '\\') {
+                    backslashes += 1;
+                }
+                else {
+                    if (ch == '\"') {
+                        for (usize iii = 0; iii < (backslashes + 1); ++iii) {
+                            str_append_char(&result, '\\');
+                        }
+                    }
+
+                    backslashes = 0;
+                }
+
+                str_append_char(&result, ch);
+            }
+
+            for (usize ii = 0; ii < backslashes; ++ii) {
+                str_append_char(&result, '\\');
+            }
+
+            str_append_char(&result, '\"');
+        }
+        else {
+            str_append_other(&result, *arg);
+        }
+    }
+
+    return result;
+}
+#endif
+
 CBA_DEF ProcessID proc_start(Command cmd, FileDescriptor output_fd) {
     ProcessID result = INVALID_HANDLE;
 
 #if CBA_WINDOWS
-    todo();
+    STARTUPINFO startup_info = {0};
+    startup_info.cb = sizeof(STARTUPINFO);
+    startup_info.dwFlags |= STARTF_USESTDHANDLES;
+    startup_info.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+
+    startup_info.hStdOutput = (output_fd != INVALID_HANDLE)
+                                  ? output_fd
+                                  : GetStdHandle(STD_OUTPUT_HANDLE);
+    startup_info.hStdError = (output_fd != INVALID_HANDLE)
+                                 ? output_fd
+                                 : GetStdHandle(STD_ERROR_HANDLE);
+
+    PROCESS_INFORMATION process_info = {0};
+    String flattened = _cmd_flatten_win32(cmd);
+    verbose_print("win32 flattened command: " stok, sfmt(flattened));
+    b32 success = CreateProcessA(
+        NULL,
+        (char*)flattened.data,
+        NULL,
+        NULL,
+        true,
+        0,
+        NULL,
+        NULL,
+        &startup_info,
+        &process_info
+    );
+
+    if (success) {
+        result = process_info.hProcess;
+        CloseHandle(process_info.hThread);
+    }
+    else {
+        verbose_print("failed to create process: %s", _os_error());
+    }
 #else
     assert(global_arena.temp_memory_pos == 0, "cannot spawn new process in a temporary memory block");
 
@@ -1839,18 +2046,18 @@ CBA_DEF ProcessID proc_start(Command cmd, FileDescriptor output_fd) {
         pid_t cpid = fork();
 
         if (cpid < 0) {
-            verbose_print("failed to fork child process: \"%s\"", strerror(errno));
+            verbose_print("failed to fork child process: %s", _os_error());
         }
         else if (cpid == 0) {
             b32 streams_valid = true;
 
             if (output_fd != INVALID_HANDLE) {
                 if (dup2(output_fd, STDERR_FILENO) < 0) {
-                    verbose_print("failed to create stderr for child process: %s", strerror(errno));
+                    verbose_print("failed to create stderr for child process: %s", _os_error());
                     streams_valid = false;
                 }
                 if (streams_valid && dup2(output_fd, STDOUT_FILENO) < 0) {
-                    verbose_print("failed to create stdout for child process: %s", strerror(errno));
+                    verbose_print("failed to create stdout for child process: %s", _os_error());
                     streams_valid = false;
                 }
             }
@@ -1876,7 +2083,7 @@ CBA_DEF ProcessID proc_start(Command cmd, FileDescriptor output_fd) {
                     end_temp_memory();
                 }
                 else {
-                    verbose_print("failed to exec child process for \"%s\": %s", arr[0], strerror(errno));
+                    verbose_print("failed to exec child process for \"%s\": %s", arr[0], _os_error());
                 }
             }
             else {
@@ -1895,14 +2102,33 @@ CBA_DEF ProcessID proc_start(Command cmd, FileDescriptor output_fd) {
 CBA_DEF i32 proc_wait(ProcessID proc) {
     i32 result = 1;
 
+    assert(proc != INVALID_HANDLE, "cannot wait on invalid process");
+
 #if CBA_WINDOWS
-    todo();
+    DWORD res = WaitForSingleObject(proc, INFINITE);
+
+    if (res != WAIT_FAILED) {
+        uninit DWORD exit_status;
+        if (GetExitCodeProcess(proc, &exit_status)) {
+            if (exit_status != 0) {
+                result = 0;
+            }
+
+            CloseHandle(proc);
+        }
+        else {
+            verbose_print("failed to get child process exit status: %s", _os_error());
+        }
+    }
+    else {
+        verbose_print("failed to wait on child process: %s", _os_error());
+    }
 #else
     for (;;) {
         int wstatus = 0;
 
         if (waitpid(proc, &wstatus, 0) < 0) {
-            verbose_print("failed to wait on command with PID %d: %s", proc, strerror(errno));
+            verbose_print("failed to wait on command with PID %d: %s", proc, _os_error());
             result = -1;
             break;
         }
@@ -2061,8 +2287,6 @@ CBA_DEF String str_from_file(const char* file_path) {
     return result;
 }
 
-CBA_DEF b32 str_write_to_file(String s, const char* path, b32 append) {
-    b32 result = false;
 CBA_DEF String str_from_cwd(void) {
     String result = str_alloc_with_cap(CBA_MAX_PATH);
 
@@ -2079,13 +2303,16 @@ CBA_DEF String str_from_cwd(void) {
     return result;
 }
 
+CBA_DEF b32 str_write_to_file(String s, const char* path, b32 append) {
+    b32 result = false;
+
     FILE* f = fopen(path, append ? "ab" : "wb");
 
     if (f) {
         usize bytes_written = fwrite(s.data, 1, s.len, f);
 
         if (!bytes_written && !feof(f)) {
-            verbose_print("failed to write string to file \"%s\": %s", path, strerror(errno));
+            verbose_print("failed to write string to file \"%s\": %s", path, _os_error());
         }
         else {
             result = true;
@@ -2094,9 +2321,8 @@ CBA_DEF String str_from_cwd(void) {
         fclose(f);
     }
     else {
-        verbose_print("failed to write string to file \"%s\": %s", path, strerror(errno));
+        verbose_print("failed to write string to file \"%s\": %s", path, _os_error());
     }
-#endif
 
     return result;
 }
@@ -2168,8 +2394,16 @@ CBA_DEF String str_path_pwd(String str) {
 CBA_DEF String str_path_to_absolute(String str) {
     String result = str_alloc_with_cap(CBA_MAX_PATH);
 
+    assert(str.data[str.len] == '\0', "string is not null-terminated");
+
 #if CBA_WINDOWS
-    todo();
+    DWORD bytes = GetFullPathNameA((char*)str.data, CBA_MAX_PATH, (char*)result.data, NULL);
+
+    if (!bytes) {
+        verbose_print("failed to get absolute path name from " stok ": %s", sfmt(str), _os_error());
+        str_clear(&result);
+        str_copy_into(&result, str);
+    }
 #else
     assert(str.len < CBA_MAX_PATH, "input path length exceeds PATH_MAX");
 
@@ -2263,14 +2497,54 @@ CBA_DEF StringArray str_to_directory_entries(String path, b32 include_directory_
     assert(path.data[path.len] == '\0', "path string is not null-terminated");
     char* path_cstr = (char*)path.data;
 
-#if CBA_WINDOWS
-    todo();
-#else
-    FileType ft = file_get_type(path_cstr);
-    assert(ft == FILE_TYPE_DIRECTORY, "the path \"%s\" is not a directory", path_cstr);
+    FileKind ft = file_get_kind(path_cstr);
+    assert(ft == FILE_KIND_DIRECTORY, "the path \"%s\" is not a directory", path_cstr);
 
+#if CBA_WINDOWS
+    uninit WIN32_FIND_DATA find_data;
+    uninit HANDLE file;
+    begin_temp_memory();
+    {
+        String tmp = str_copy(path);
+
+        if (tmp.data[tmp.len - 1] != '\\') {
+            str_append_char(&tmp, '\\');
+            str_append_null(&tmp);
+        }
+
+        file = FindFirstFileA((char*)tmp.data, &find_data);
+    }
+    end_temp_memory();
+
+    if (file != INVALID_HANDLE) {
+        do {
+            String entry = str_from_cstr((const char*)find_data.cFileName);
+
+            print("next file in dir: " stok, sfmt(entry));
+
+            if (include_directory_path) {
+                str_append_other(&entry, path);
+
+                if (!is_separator(path.data[path.len - 1])) {
+                    str_append_char(&entry, CBA_PATH_SEPARATOR);
+                }
+            }
+
+            str_arr_append_str(&result, entry);
+        } while (FindNextFileA(file, &find_data));
+
+        if (GetLastError() != ERROR_NO_MORE_FILES) {
+            verbose_print("error getting next directory entry: %s", _os_error());
+        }
+
+        FindClose(file);
+    }
+    else {
+        verbose_print("failed to open directory \"%.*s\": %s", sfmt(path), _os_error());
+    }
+#else
     DIR* d = opendir(path_cstr);
-    assert(d, "failed to open dir \"%s\": %s", path_cstr, strerror(errno));
+    assert(d, "failed to open dir \"%s\": %s", path_cstr, _os_error());
 
     struct dirent* dent = NULL;
 
@@ -3270,6 +3544,7 @@ CBA_DEF void cmd_append_str(Command* cmd, String str) {
         cmd->count = 0;
     }
 
+    assert(str.len, "cannot append empty string to command");
     assert(cmd->count < CBA_ARRAY_CAPACITY,
            "tried to exceed maximum command count (current: %zu)",
            cmd->count);
@@ -3280,6 +3555,7 @@ CBA_DEF void cmd_append_str(Command* cmd, String str) {
 
 CBA_DEF void cmd_append_str_arr(Command* cmd, StringArray arr) {
     for (usize i = 0; i < arr.count; ++i) {
+        assert(arr.items[i].len, "cannot append empty string to command (element %zu of string array)", i);
         cmd_append_str(cmd, arr.items[i]);
     }
 }
@@ -3291,6 +3567,7 @@ CBA_DEF void __cmd_append_va(Command* cmd, usize n, ...) {
     for (usize i = 0; i < n; ++i) {
         const char* arg = va_arg(args, const char*);
         cmd_append_str(cmd, str_from_cstr(arg));
+        assert(cmd->items[cmd->count - 1].len, "cannot append empty string to command (argument %zu of variadic append)", i);
     }
 
     va_end(args);
@@ -3332,7 +3609,7 @@ CBA_DEF void cmd_append_split(Command* cmd, const char* args) {
                 double_quote_pos = -1;
             }
             else {
-                double_quote_pos = i;
+                double_quote_pos = (i32)i;
             }
         }
         else if (args_str.data[i] == '\'') {
@@ -3348,7 +3625,7 @@ CBA_DEF void cmd_append_split(Command* cmd, const char* args) {
                 double_quote_pos = -1;
             }
             else {
-                single_quote_pos = i;
+                single_quote_pos = (i32)i;
             }
         }
         else if (args_str.data[i] == ' ') {
@@ -3382,13 +3659,13 @@ CBA_DEF b32 cmd_try_run_with_opts(Command cmd, CommandOptions opts) {
 
     usize sp = global_arena.used;
 
-    verbose_print("running \"%s\"", cmd_flatten_to_cstr(cmd));
+    verbose_print("running `%s`", cmd_flatten_to_cstr(cmd));
 
     FileDescriptor output_fd = INVALID_HANDLE;
     char* output_file_path = NULL;
 
-    if (opts.output_string) {
-        assert(!opts.async_pid, "cannot read command output to string when running as async");
+    if (opts.silence_output || opts.output_string) {
+        assert(!opts.async_pid, "cannot silence and/or read command output to string when running as async");
 
         static u64 output_file_id = 0;
 
@@ -3417,15 +3694,15 @@ CBA_DEF b32 cmd_try_run_with_opts(Command cmd, CommandOptions opts) {
             result = true;
 
             if (opts.output_string) {
-                usize bytes = (usize)lseek(output_fd, 0, SEEK_END);
+                usize bytes = _seek_fd(output_fd, true);
 
                 *opts.output_string = str_alloc_with_cap(bytes);
 
                 if (bytes > 0) {
-                    assert(lseek(output_fd, 0, SEEK_SET) == 0, "incorrect seek position");
+                    assert(_seek_fd(output_fd, false) == 0, "incorrect seek position");
 
-                    isize bytes_read = (isize)read(output_fd, opts.output_string->data, bytes);
-                    assert(bytes_read != -1, "failed to read from output file \"%s\": %s", output_file_path, strerror(errno));
+                    isize bytes_read = _read_fd(output_fd, opts.output_string->data, bytes);
+                    assert(bytes_read != -1, "failed to read from output file \"%s\": %s", output_file_path, _os_error());
 
                     opts.output_string->len = bytes_read;
                 }
@@ -3435,12 +3712,12 @@ CBA_DEF b32 cmd_try_run_with_opts(Command cmd, CommandOptions opts) {
         }
     }
 
-    if (output_file_path) {
-        file_delete(output_file_path);
-    }
-
     if (output_fd != INVALID_HANDLE) {
         _close_fd(output_fd);
+    }
+
+    if (output_file_path && !file_delete(output_file_path)) {
+        verbose_print("failed to remove output file \"%s\": %s", output_file_path, _os_error());
     }
 
     return result;
