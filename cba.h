@@ -271,8 +271,9 @@
     #define CBA_UNREACHABLE __builtin_unreachable()
     #define CBA_TRAP __builtin_trap()
 
-    // @todo: check that this works correctly
-    #define CBA_UNUSED __attribute__((unused))
+    // #define CBA_UNUSED(x) __attribute__((unused))(x)
+    // @nocheckin
+    #define CBA_UNUSED(x) (void)(x)
 #endif
 
 #if CBA_MSVC
@@ -433,25 +434,25 @@ typedef int32_t   b32;
 typedef float     f32;
 typedef double    f64;
 
-#define ___STATIC_ASSERT(cond, msg) typedef char static_assert_##msg[(!!(cond))*2-1]
-#define __STATIC_ASSERT(cond, line) ___STATIC_ASSERT(cond, at_line_##line)
-#define _STATIC_ASSERT(cond, line)  __STATIC_ASSERT(cond, line)
-#define STATIC_ASSERT(cond)         _STATIC_ASSERT(cond, __LINE__)
+#define ___CBA_STATIC_ASSERT(cond, msg) typedef char static_assert_##msg[(!!(cond))*2-1]
+#define __CBA_STATIC_ASSERT(cond, line) ___CBA_STATIC_ASSERT(cond, at_line_##line)
+#define _CBA_STATIC_ASSERT(cond, line)  __CBA_STATIC_ASSERT(cond, line)
+#define CBA_STATIC_ASSERT(cond)         _CBA_STATIC_ASSERT(cond, __LINE__)
 
-STATIC_ASSERT(sizeof(u8)  == sizeof(i8));
-STATIC_ASSERT(sizeof(u16) == sizeof(i16));
-STATIC_ASSERT(sizeof(u32) == sizeof(i32));
-STATIC_ASSERT(sizeof(u64) == sizeof(i64));
+CBA_STATIC_ASSERT(sizeof(u8)  == sizeof(i8));
+CBA_STATIC_ASSERT(sizeof(u16) == sizeof(i16));
+CBA_STATIC_ASSERT(sizeof(u32) == sizeof(i32));
+CBA_STATIC_ASSERT(sizeof(u64) == sizeof(i64));
 
-STATIC_ASSERT(sizeof(u8)  == 1);
-STATIC_ASSERT(sizeof(u16) == 2);
-STATIC_ASSERT(sizeof(u32) == 4);
-STATIC_ASSERT(sizeof(u64) == 8);
+CBA_STATIC_ASSERT(sizeof(u8)  == 1);
+CBA_STATIC_ASSERT(sizeof(u16) == 2);
+CBA_STATIC_ASSERT(sizeof(u32) == 4);
+CBA_STATIC_ASSERT(sizeof(u64) == 8);
 
-STATIC_ASSERT(sizeof(usize) == sizeof(isize));
+CBA_STATIC_ASSERT(sizeof(usize) == sizeof(isize));
 
-STATIC_ASSERT(sizeof(f32) == 4);
-STATIC_ASSERT(sizeof(f64) == 8);
+CBA_STATIC_ASSERT(sizeof(f32) == 4);
+CBA_STATIC_ASSERT(sizeof(f64) == 8);
 
 #define U8_MIN (0x00u)
 #define U8_MAX (0xffu)
