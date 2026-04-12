@@ -35,9 +35,9 @@
         CBA_REBUILD(argc, argv);
 
         // Create a directory (also works recursively).
-        assert(try_mkdir("build"), "failed to create build directory");
+        assert(file_try_create_directory("build"), "failed to create build directory");
 
-        // A command is an array of arguments, which later can be run via the shell.
+        // A command is an array of arguments which can be run via the shell.
         Command cmd = {0};
 
         // Use the CBA_COMPILER_* macros for compiler-specific flags.
@@ -50,10 +50,10 @@
         );
 
         // With GCC, the above forms:
-        //   gcc -ggdb -DDEBUG -Wall -Wextra -o build/main main.c
+        //   gcc -ggdb -DDEBUG -Wall -Wextra -o build/artefacts/main main.c
         //
         // And with MSVC:
-        //   cl.exe /ZI /DDEBUG /W4 /nologo /Fe:build/main main.c
+        //   cl.exe /D_CRT_SECURE_NO_WARNINGS /DDEBUG /W4 /nologo /Fe:build/artefacts/main main.c
 
         // Run the command, block until it terminates, and assert that it exits normally.
         cmd_run(cmd);

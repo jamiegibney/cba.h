@@ -1,19 +1,16 @@
 # `cba.h`
 
-For when you CBA with CMake.
+This is a [stb-style](https://github.com/nothings/stb) header-only library
+designed for writing build recipes in C, and for useful C utilities. It's
+largely based on tsoding's [nob.h library](https://github.com/tsoding/nob.h) —
+a great alternative for the "no-build" approach.
 
-This is a [stb-style header-only library](https://github.com/nothings/stb)
-designed for writing build recipes in C, and for useful C utilities.
-
-The idea is chiefly based on tsoding's [nob.h
-library](https://github.com/tsoding/nob.h), but with a variety changes that I
-either prefer or which I'm experimenting with.
-
-Grab only the header with:
+Grab only `cba.h` with:
 
 ```sh
 wget https://raw.githubusercontent.com/jamiegibney/cba.h/refs/heads/master/cba.h
 ```
+
 
 ## Usage
 
@@ -43,8 +40,8 @@ int main(int argc, char** argv) {
     // Allow the program to rebuild itself when modified.
     CBA_REBUILD(argc, argv);
 
-    // Recursively create a directory.
-    assert(try_mkdir("build/artefacts"), "failed to create build directory");
+    // Create a directory (also works recursively).
+    assert(file_try_create_directory("build"), "failed to create build directory");
 
     // A command is an array of arguments which can be run via the shell.
     Command cmd = {0};
@@ -62,7 +59,7 @@ int main(int argc, char** argv) {
     //   gcc -ggdb -DDEBUG -Wall -Wextra -o build/artefacts/main main.c
     //
     // And with MSVC:
-    //   cl.exe /ZI /DDEBUG /W4 /nologo /Fe:build/artefacts/main main.c
+    //   cl.exe /D_CRT_SECURE_NO_WARNINGS /DDEBUG /W4 /nologo /Fe:build/artefacts/main main.c
 
     // Run the command, block until it terminates, and assert that it exits normally.
     cmd_run(cmd);
@@ -71,12 +68,16 @@ int main(int argc, char** argv) {
 }
 ```
 
-Compile the above once with, e.g.:
+Compile the above once with e.g.:
 ```sh
 gcc -o cba cba.c
 ```
 
 And when the source file is modified, the program will automatically rebuild itself when run.
+
+> [!NOTE]
+> Only MSVC versions 19.0 and above (i.e. Visual Studio 2026) are supported due
+> to its compliance with certain C99 features.
 
 ## Other utilities
 
@@ -94,8 +95,11 @@ allocator, file operations, string operations, and more.
 ## Todo
 
 - [x] Flesh out Windows support
-- [ ] Ensure that both path separators are supported
+- [ ] API document (perhaps with a tool to extract doc comments)
+- [ ] Ensure that either path separator is supported on all platforms?
 - [ ] Dynamic array (and perhaps a #define for enabling dynamic allocation)
+    - Have a look at the `da_append` implementation in `nob.h`
 - [ ] Hash table/set
+- [ ] Automatic `compile_commands.json` generation?
 - [ ] Piping mechanism
-- [ ] Optional function prefixes (perhaps with `#define CBA_STRIP_PREFIXES`)
+- [ ] Optional function prefixes (perhaps `#define CBA_STRIP_PREFIXES`)
