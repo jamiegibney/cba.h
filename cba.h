@@ -100,8 +100,8 @@
 */
 
 
-#ifndef CBA_H
-#define CBA_H
+#ifndef CBA_HEADER_GUARD
+#define CBA_HEADER_GUARD
 
 #ifndef CBA_ARRAY_CAPACITY
     #define CBA_ARRAY_CAPACITY (256)
@@ -3433,7 +3433,7 @@ CBA_DEF char* cmd_flatten_to_cstr_with_delims(Command cmd, char delim) {
 
 #endif // CBA_IMPLEMENTATION
 
-#endif // CBA_H
+#endif // CBA_HEADER_GUARD
 
 /*
     # Version history
