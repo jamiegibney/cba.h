@@ -19,7 +19,7 @@
 
     #define CBA_VERBOSE            to see internal logging (e.g. for errors)
     #define CBA_NO_COLOR_OUTPUT    to prevent coloured output (remove ANSI codes)
-    #define CBA_PRINT_ON_REBUILD   to see a message when a program rebuilds itself
+    #define CBA_PRINT_ON_REBUILD   to see messages when a program rebuilds itself
 
     All functions in this header are documented via comments above their definitions.
   
@@ -67,12 +67,13 @@
 
     Before including this file, #define any of the below options to override them:
   
-    - CBA_REBUILD_COMMAND            the command to use for rebuilding
-    - CBA_REBUILD_MESSAGE            formatted message printed when rebuilding
-    - CBA_[INFO/WARN/ERROR]_PREFIX   prefix to use for info/warn/error macros
-    - CBA_MEMORY_BLOCK_SIZE          number of bytes to allocate to the global arena
-    - CBA_DEFAULT_STRING_CAPACITY    default (minimum) capacity for strings
-    - CBA_ARRAY_CAPACITY             maximum number of elements allocated to arrays
+    - CBA_REBUILD_COMMAND             the command to use for rebuilding
+    - CBA_REBUILD_FAILED_MESSAGE      formatted message printed when a rebuild fails
+    - CBA_REBUILD_COMPLETED_MESSAGE   formatted message printed when a rebuild succeeds
+    - CBA_[INFO/WARN/ERROR]_PREFIX    prefix to use for info/warn/error macros
+    - CBA_MEMORY_BLOCK_SIZE           number of bytes to allocate to the global arena
+    - CBA_DEFAULT_STRING_CAPACITY     default (minimum) capacity for strings
+    - CBA_ARRAY_CAPACITY              maximum number of elements allocated to arrays
 
 
     
@@ -346,8 +347,11 @@
 
 #define CBA_DEF inline static
 
-#ifndef CBA_REBUILD_MESSAGE
-    #define CBA_REBUILD_MESSAGE(binary_name) alloc_sprintf("Rebuilding \"%s\"", (binary_name))
+#ifndef CBA_REBUILD_FAILED_MESSAGE
+    #define CBA_REBUILD_FAILED_MESSAGE(binary_name) alloc_sprintf("Failed to rebuild \"%s\"", (binary_name))
+#endif
+#ifndef CBA_REBUILD_COMPLETED_MESSAGE
+    #define CBA_REBUILD_COMPLETED_MESSAGE(binary_name, elapsed_ns) alloc_sprintf("Rebuilt \"%s\" in %s", (binary_name), fmt_time((elapsed_ns), 0))
 #endif
 
 #ifndef CBA_REBUILD_COMMAND
@@ -1125,9 +1129,12 @@ CBA_DEF char* win32_err_message(DWORD err) {
 #endif
 
 CBA_DEF void __cba_rebuild(int argc, char** argv, const char* source_path, ...) {
+    u64 start_ns = nanos_now();
+
     int exit_code = 0;
 
     String binary_path = str_from_cstr(argv[0]);
+    const char* binary_path_cstr = (char*)binary_path.data;
 
 #if CBA_WINDOWS
     if (!str_ends_with(binary_path, ".exe")) {
@@ -1155,6 +1162,7 @@ CBA_DEF void __cba_rebuild(int argc, char** argv, const char* source_path, ...) 
     va_end(args);
 
     i32 rebuild_needed = files_needs_rebuild(binary_path, source_paths);
+
     if (rebuild_needed == -1) {
         exit_code = 1;
     }
@@ -1162,12 +1170,7 @@ CBA_DEF void __cba_rebuild(int argc, char** argv, const char* source_path, ...) 
         Command cmd = {0};
         String old_binary_path = str_sprintf("%.*s.bak", sfmt(binary_path));
 
-        const char* binary_path_cstr = (char*)binary_path.data;
         const char* old_binary_path_cstr = (char*)old_binary_path.data;
-
-#if defined(CBA_PRINT_ON_REBUILD) || defined(CBA_VERBOSE)
-        info("%s", CBA_REBUILD_MESSAGE(binary_path_cstr));
-#endif
 
         if (file_move(binary_path_cstr, old_binary_path_cstr)) {
             cmd_append(&cmd, CBA_REBUILD_COMMAND(argv[0], source_path));
@@ -1176,6 +1179,12 @@ CBA_DEF void __cba_rebuild(int argc, char** argv, const char* source_path, ...) 
             cmd_reset(&cmd);
 
             if (success) {
+#if defined(CBA_PRINT_ON_REBUILD) || defined(CBA_VERBOSE)
+                if (exit_code == 0) {
+                    info("%s", CBA_REBUILD_COMPLETED_MESSAGE(binary_path_cstr, nanos_now() - start_ns));
+                }
+#endif
+
                 // re-run the previous command with the new binary.
                 StringArray args = str_arr_from_cstr_arr(argv + 1, (usize)(argc - 1));
                 cmd_append_str(&cmd, binary_path);
@@ -1189,6 +1198,9 @@ CBA_DEF void __cba_rebuild(int argc, char** argv, const char* source_path, ...) 
                 }
             }
             else {
+#if defined(CBA_PRINT_ON_REBUILD) || defined(CBA_VERBOSE)
+                error("%s", CBA_REBUILD_FAILED_MESSAGE(binary_path_cstr));
+#endif
                 assert(file_move(old_binary_path_cstr, binary_path_cstr),
                        "failed to move old binary back to the current one");
                 exit_code = 1;
