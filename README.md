@@ -93,7 +93,7 @@ allocator, file operations, string operations, and more.
 
 ## Todo
 
-- [ ] Flesh out Windows support
+- [x] Flesh out Windows support
 - [ ] Ensure that both path separators are supported
 - [ ] Dynamic array (and perhaps a #define for enabling dynamic allocation)
 - [ ] Hash table/set
