@@ -917,6 +917,26 @@ CBA_DEF b32 str_starts_with(String str, const char* cstr);
 /// Whether `str` ends with `cstr` (excluding a null-terminator).
 CBA_DEF b32 str_ends_with(String str, const char* cstr);
 
+/// Whether any characters in the `needles` C-string could be found in `haystack`. When
+/// `case_sensitive` is false, case is ignored for alphabetic characters. When `where` is
+/// non-NULL, it is set to the index of the first matching character, if found.
+CBA_DEF b32 str_find_first_of_any_in_cstr(String haystack, const char* needles, b32 case_sensitive, usize* where);
+/// Whether any characters in the `needles` array of `count` elements could be found in
+/// `haystack`. When `case_sensitive` is false, case is ignored for alphabetic characters.
+/// When `where` is non-NULL, it is set to the index of the first matching character, if
+/// found.
+CBA_DEF b32 str_find_first_of_any(String haystack, const char* needles, usize count, b32 case_sensitive, usize* where);
+
+/// Whether any characters in the `needles` C-string could be found in `haystack`. When
+/// `case_sensitive` is false, case is ignored for alphabetic characters. When `where` is
+/// non-NULL, it is set to the index of the last matching character, if found.
+CBA_DEF b32 str_find_last_of_any_in_cstr(String haystack, const char* needles, b32 case_sensitive, usize* where);
+/// Whether any characters in the `needles` array of `count` elements could be found in
+/// `haystack`. When `case_sensitive` is false, case is ignored for alphabetic characters.
+/// When `where` is non-NULL, it is set to the index of the last matching character, if
+/// found.
+CBA_DEF b32 str_find_last_of_any(String haystack, const char* needles, usize count, b32 case_sensitive, usize* where);
+
 /// Whether `needle` could be found in `haystack`. When `where` is non-NULL, it is set to
 /// the index of the first matching character, if found.
 CBA_DEF b32 str_find_first_char(String haystack, char needle, usize* where);
@@ -2608,6 +2628,66 @@ CBA_DEF b32 str_ends_with(String str, const char* cstr) {
         u8* ptr = str.data + (str.len - len);
         result = memcmp(ptr, cstr, len) == 0;
     }
+
+    return result;
+}
+
+CBA_DEF b32 str_find_first_of_any_in_cstr(String haystack, const char* needles, b32 case_sensitive, usize* where) {
+    return str_find_first_of_any(haystack, needles, (usize)strlen(needles), case_sensitive, where);
+}
+
+CBA_DEF b32 str_find_first_of_any(String haystack, const char* needles, usize count, b32 case_sensitive, usize* where) {
+    b32 result = false;
+
+    for (usize i = 0; i < haystack.len; ++i) {
+        for (usize ii = 0; ii < count; ++ii) {
+            u8 a = haystack.data[i];
+            u8 b = needles[ii];
+
+            if ((a == b) || (!case_sensitive && is_alpha(a) && is_alpha(b) && ((a ^ 0x20) == b))) {
+                result = true;
+
+                if (where) {
+                    *where = i;
+                }
+
+                goto outer;
+            }
+        }
+    }
+
+outer:
+
+    return result;
+}
+
+CBA_DEF b32 str_find_last_of_any_in_cstr(String haystack, const char* needles, b32 case_sensitive, usize* where) {
+    return str_find_last_of_any(haystack, needles, (usize)strlen(needles), case_sensitive, where);
+}
+
+CBA_DEF b32 str_find_last_of_any(String haystack, const char* needles, usize count, b32 case_sensitive, usize* where) {
+    b32 result = false;
+
+    for (usize i = 0; i < haystack.len; ++i) {
+        usize idx = haystack.len - i - 1;
+
+        for (usize ii = 0; ii < count; ++ii) {
+            u8 a = haystack.data[idx];
+            u8 b = needles[ii];
+
+            if ((a == b) || (!case_sensitive && is_alpha(a) && is_alpha(b) && ((a ^ 0x20) == b))) {
+                result = true;
+
+                if (where) {
+                    *where = idx;
+                }
+
+                goto outer;
+            }
+        }
+    }
+
+outer:
 
     return result;
 }
