@@ -256,8 +256,6 @@
     #else
         #define CBA_TRAP __debugbreak()
     #endif
-
-    #define CBA_UNUSED(x) (void)(x)
 #else
     #if defined(__MINGW_PRINTF_FORMAT)
         #define PRINTF_FORMAT(STRING_INDEX, FIRST_TO_CHECK) __attribute__ ((format (__MINGW_PRINTF_FORMAT, STRING_INDEX, FIRST_TO_CHECK)))
@@ -270,11 +268,9 @@
     #define CBA_FALLTHROUGH [[fallthrough]]
     #define CBA_UNREACHABLE __builtin_unreachable()
     #define CBA_TRAP __builtin_trap()
-
-    // #define CBA_UNUSED(x) __attribute__((unused))(x)
-    // @nocheckin
-    #define CBA_UNUSED(x) (void)(x)
 #endif
+
+#define CBA_UNUSED(x) (void)(x)
 
 #if CBA_MSVC
     #ifndef __FILE_NAME__
@@ -366,7 +362,6 @@
 #define unreachable() CBA_UNREACHABLE; panic("unreachable code path was hit")
 
 #define CBA_DEF inline static
-
 
 #if defined(__cplusplus)
     #define CBA_LITERAL(type) type
@@ -1397,7 +1392,7 @@ static usize _seek_fd(FileDescriptor fd, b32 end) {
     DWORD pos = SetFilePointer(fd, 0, NULL, end ? FILE_END : FILE_BEGIN);
     assert(pos != INVALID_SET_FILE_POINTER, "failed to seek file");
 #else
-    result = (usize)lseek(output_fd, 0, end ? SEEK_END : SEEK_SET);
+    result = (usize)lseek(fd, 0, end ? SEEK_END : SEEK_SET);
 #endif
 
     return result;
@@ -1566,9 +1561,6 @@ CBA_DEF b32 file_move(const char* path, const char* new_path) {
     b32 result = false;
 
 #if CBA_WINDOWS
-    // @todo: this will replace existing files at the new path. Does the rename function
-    // below do the same? I'd imagine that is the preferred behaviour (which should be
-    // documented if so), because the user can always check if there's a file existing there.
     result = MoveFileExA(path, new_path, MOVEFILE_REPLACE_EXISTING);
 #else
     result = rename(path, new_path) == 0;
@@ -1864,8 +1856,7 @@ CBA_INLINE b32 _create_dir(const char* path) {
     b32 result = true;
 
     if (!file_exists(path)) {
-        // @todo: does this function not return 0 on success?
-        b32 res = mkdir(path, 0755);
+        int res = mkdir(path, 0755);
 
         if (res < 0) {
             assert(errno != EEXIST, "the file should not exist, because it has already been checked");
@@ -2433,7 +2424,7 @@ CBA_DEF String str_path_to_absolute(String str) {
             // the path appears relative, so prepending the cwd should work.
             begin_temp_memory();
             {
-                String cwd = get_cwd();
+                String cwd = str_from_cwd();
                 str_append_other(&result, cwd);
             }
             end_temp_memory();
