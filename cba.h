@@ -1,5 +1,5 @@
 /*  
-    cba.h | v1.0.0 | https://github.com/jamiegibney/cba.h
+    cba.h | v1.0.1 | https://github.com/jamiegibney/cba.h
   
     Single-header library for build recipes and general utilities in C.
 
@@ -3926,6 +3926,10 @@ CBA_DEF char* cmd_flatten_to_cstr_with_delims(Command cmd, char delim) {
 /*
     # Version history
 
+    - v1.1.1 (13 Apr 2026) (by @jamiegibney)
+        - macOS/Linux fixes
+        - New string functions
+        - Updated version history formatting
     - v1.0.0 (12 Apr 2026) (by @jamiegibney)
         - Windows support
         - MSVC support (19.0+ only)
