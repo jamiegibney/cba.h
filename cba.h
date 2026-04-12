@@ -494,19 +494,19 @@ CBA_STATIC_ASSERT(sizeof(f64) == 8);
 #define F64_EPSILON (2.2204460492503131e-16)
 
 /// A kind of file type.
-enum FileType {
-    /// The file type could not be detected.
-    FILE_TYPE_UNKNOWN = 0,
+enum FileKind {
+    /// The file's type could not be detected.
+    FILE_KIND_UNKNOWN = 0,
     /// The file is a regular file.
-    FILE_TYPE_REGULAR,
+    FILE_KIND_REGULAR,
     /// The file is a directory.
-    FILE_TYPE_DIRECTORY,
+    FILE_KIND_DIRECTORY,
     /// The file is a symbolic link.
-    FILE_TYPE_SYMLINK,
-    /// The file type was detected, but is not covered.
-    FILE_TYPE_OTHER,
+    FILE_KIND_SYMLINK,
+    /// The file's type was detected, but is not covered.
+    FILE_KIND_OTHER,
 };
-typedef enum FileType FileType;
+typedef enum FileKind FileKind;
 
 /// An arena allocator, used for linearly partitioning a memory block into smaller
 /// regions.
@@ -702,7 +702,7 @@ CBA_DEF b32 file_delete(const char* path);
 /// Whether a file at `path` exists.
 CBA_DEF b32 file_exists(const char* path);
 /// Returns the type of the file at `path`.
-CBA_DEF FileType file_get_type(const char* path);
+CBA_DEF FileKind file_get_kind(const char* path);
 /// Returns the length of the file in bytes.
 CBA_DEF usize file_length(const char* path);
 /// Reads a number of `bytes` from the file into the `dest` memory.
@@ -1555,11 +1555,11 @@ CBA_DEF b32 file_delete(const char* path) {
     todo();
 #else
     if (file_exists(path)) {
-        FileType ft = file_get_type(path);
+        FileKind ft = file_get_kind(path);
 
-        assert(ft != FILE_TYPE_UNKNOWN, "the file exists, so its type should have been recognised");
+        assert(ft != FILE_KIND_UNKNOWN, "the file exists, so its type should have been recognised");
 
-        if (ft == FILE_TYPE_DIRECTORY) {
+        if (ft == FILE_KIND_DIRECTORY) {
             int r = nftw(path, _rment, 512, FTW_PHYS | FTW_DEPTH);
 
             if (r == 0) {
@@ -1600,8 +1600,8 @@ CBA_DEF b32 file_exists(const char* path) {
     return result;
 }
 
-CBA_DEF FileType file_get_type(const char* path) {
-    FileType result = FILE_TYPE_UNKNOWN;
+CBA_DEF FileKind file_get_kind(const char* path) {
+    FileKind result = FILE_KIND_UNKNOWN;
 
 #if CBA_WINDOWS
     todo();
@@ -1609,16 +1609,16 @@ CBA_DEF FileType file_get_type(const char* path) {
     uninit struct stat statbuf;
     if (lstat(path, &statbuf) >= 0) {
         if (S_ISREG(statbuf.st_mode)) {
-            result = FILE_TYPE_REGULAR;
+            result = FILE_KIND_REGULAR;
         }
         else if (S_ISDIR(statbuf.st_mode)) {
-            result = FILE_TYPE_DIRECTORY;
+            result = FILE_KIND_DIRECTORY;
         }
         else if (S_ISLNK(statbuf.st_mode)) {
-            result = FILE_TYPE_SYMLINK;
+            result = FILE_KIND_SYMLINK;
         }
         else {
-            result = FILE_TYPE_OTHER;
+            result = FILE_KIND_OTHER;
         }
     }
     else {
