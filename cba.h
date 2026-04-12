@@ -692,7 +692,7 @@ CBA_DEF void* arena_alloc(Arena* arena, usize size);
 /// If any files in the `input_paths` array have been modified since the file at
 /// `output_path`, `1` is returned and `0` otherwise. If an error occurs, `-1` is
 /// returned.
-CBA_DEF i32 files_needs_rebuild(String output_path, StringArray input_paths);
+CBA_DEF i32 files_need_rebuild(String output_path, StringArray input_paths);
 /// If the file at `input_path` has been modified since the file at `output_path`, `1` is
 /// returned and `0` otherwise. If an error occurs (i.e. a filesystem error), `-1` is
 /// returned.
