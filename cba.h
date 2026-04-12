@@ -899,7 +899,7 @@ CBA_DEF b32 str_find_first_other(String haystack, String needle, b32 case_sensit
 /// Whether `needle` could be found in `haystack`. When `case_sensitive` is false, case is
 /// ignored for alphabetic characters. When `where` is non-NULL, it is set to the index of
 /// the last matching string, if found.
-CBA_DEF b32 str_find_last_other(String haystack, String needle, usize* where);
+CBA_DEF b32 str_find_last_other(String haystack, String needle, b32 case_sensitive, usize* where);
 /// Whether `needle` could be found in `haystack`. When `case_sensitive` is false, case is
 /// ignored for alphabetic characters. When `where` is non-NULL, it is set to the index of
 /// the first matching string, if found.
@@ -2675,36 +2675,72 @@ CBA_DEF b32 str_find_first_other(String haystack, String needle, b32 case_sensit
     return result;
 }
 
-CBA_DEF b32 str_find_last_other(String haystack, String needle, usize* where) {
-    (void)haystack;
-    (void)needle;
-    (void)where;
-
+CBA_DEF b32 str_find_last_other(String haystack, String needle, b32 case_sensitive, usize* where) {
     b32 result = false;
-    // @todo
-    todo();
+
+    if (haystack.len && needle.len && (haystack.len > needle.len)) {
+        isize off = haystack.len - needle.len;
+
+        do {
+            b32 mismatch = false;
+
+            for (usize i = 0; i < needle.len; ++i) {
+                u8 a = haystack.data[off + i];
+                u8 b = needle.data[i];
+
+                if (case_sensitive || !is_alpha(a) || !is_alpha(b)) {
+                    mismatch = a != b;
+                }
+                else {
+                    // @jcg: xor-ing an alphabetic ascii character with 32 (0x20) flips its case.
+                    mismatch = (a != b) && ((a ^ 0x20) != b);
+                }
+
+                if (mismatch) {
+                    break;
+                }
+            }
+
+            if (!mismatch) {
+                result = true;
+
+                if (where) {
+                    *where = off;
+                }
+
+                break;
+            }
+
+            off -= 1;
+        } while (off >= 0);
+    }
+
     return result;
 }
 
 CBA_DEF b32 str_find_first_cstr(String haystack, const char* needle, b32 case_sensitive, usize* where) {
+    uninit b32 result;
+
     begin_temp_memory();
-
-    String needle_str = str_from_cstr(needle);
-    b32 result = str_find_first_other(haystack, needle_str, case_sensitive, where);
-
+    {
+        String needle_str = str_from_cstr(needle);
+        result = str_find_first_other(haystack, needle_str, case_sensitive, where);
+    }
     end_temp_memory();
+
     return result;
 }
 
 CBA_DEF b32 str_find_last_cstr(String haystack, const char* needle, b32 case_sensitive, usize* where) {
-    (void)haystack;
-    (void)needle;
-    (void)case_sensitive;
-    (void)where;
+    uninit b32 result;
 
-    b32 result = false;
-    // @todo
-    todo();
+    begin_temp_memory();
+    {
+        String needle_str = str_from_cstr(needle);
+        result = str_find_last_other(haystack, needle_str, case_sensitive, where);
+    }
+    end_temp_memory();
+
     return result;
 }
 
