@@ -1,5 +1,5 @@
 /*  
-    cba.h | v0.1.2 | https://github.com/jamiegibney/cba.h
+    cba.h | v1.0.0 | https://github.com/jamiegibney/cba.h
   
     Single-header library for build recipes and general utilities in C.
 
@@ -3804,6 +3804,17 @@ CBA_DEF char* cmd_flatten_to_cstr_with_delims(Command cmd, char delim) {
 /*
     # Version history
 
+    - v1.0.0 (12 Apr 2026) (by @jamiegibney)
+        - Windows support
+        - MSVC support (19.0+ only)
+        - Added an option for silencing command outputs
+        - Updated string and command functions
+        - Arena allocations now use CBA_ALIGNMENT for alignment
+        - Updated ANSI escape codes with `\x*` prefixes
+        - Fixed CBA_UNUSED and static assertion macros
+        - Implemented CBA_LITERAL calls
+        - Updated function documentation
+        - Replaced internal strerror and GetLastError calls with _os_error
     - v0.1.2 (11 Apr 2026) (by @jamiegibney)
         - added CBA_NO_COLOR_OUTPUT
         - assert and panic now use traps
