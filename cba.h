@@ -568,6 +568,14 @@ typedef struct Command Command;
 /// @jcg: simply used as a marker.
 #define uninit
 
+#ifdef min
+    #undef min
+#endif
+
+#ifdef max
+    #undef max
+#endif
+
 #define abs(x)           ((x) < 0 ? -(x) : (x))
 #define min(a, b)        ((a) < (b) ? (a) : (b))
 #define max(a, b)        ((a) > (b) ? (a) : (b))
