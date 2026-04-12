@@ -152,6 +152,10 @@
 #elif defined(_MSC_VER)
     #undef CBA_MSVC
     #define CBA_MSVC 1
+
+    #if _MSC_VER < 1900
+        #error MSVC versions below 19.0 are not supported
+    #endif
 #else
     #error unsupported complier
 #endif
@@ -202,6 +206,9 @@
 
 #if CBA_WINDOWS
     #define WIN32_LEAN_AND_MEAN
+    #ifndef _CRT_SECURE_NO_WARNINGS
+        #define _CRT_SECURE_NO_WARNINGS (1)
+    #endif
     #define _WINUSER_
     #define _WINGDI_
     #define _WINCON_
@@ -250,8 +257,7 @@
         #define CBA_TRAP __debugbreak()
     #endif
 
-    // @todo: check that this works correctly.
-    #define CBA_UNUSED [[maybe_unused]]
+    #define CBA_UNUSED(x) (void)(x)
 #else
     #if defined(__MINGW_PRINTF_FORMAT)
         #define PRINTF_FORMAT(STRING_INDEX, FIRST_TO_CHECK) __attribute__ ((format (__MINGW_PRINTF_FORMAT, STRING_INDEX, FIRST_TO_CHECK)))
@@ -360,6 +366,13 @@
 
 #define CBA_DEF inline static
 
+
+#if defined(__cplusplus)
+    #define CBA_LITERAL(type) type
+#else
+    #define CBA_LITERAL(type) (type)
+#endif
+
 #ifndef CBA_REBUILD_FAILED_MESSAGE
     #define CBA_REBUILD_FAILED_MESSAGE(binary_name) alloc_sprintf("Failed to rebuild \"%s\"", (binary_name))
 #endif
@@ -381,7 +394,7 @@
             #define CBA_REBUILD_COMMAND(output_path, source_path) "gcc", "-DDEBUG", "-Wall", "-Wextra", "-o", output_path, source_path
         #endif
     #elif CBA_MSVC
-        #define CBA_REBUILD_COMMAND(output_path, source_path) "cl.exe", "/DDEBUG", "/W4", "/nologo", alloc_sprintf("/Fe:%s", (output_path)), source_path
+        #define CBA_REBUILD_COMMAND(output_path, source_path) "cl.exe", "/D_CRT_SECURE_NO_WARNINGS", "/DDEBUG", "/W4", "/wd4129", "/nologo", alloc_sprintf("/Fe:%s", (output_path)), source_path
     #else
     #endif
 #endif // CBA_REBUILD_COMMAND
