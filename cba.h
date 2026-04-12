@@ -546,10 +546,19 @@ typedef struct StringArray StringArray;
 /// Options to provide when running a command.
 struct CommandOptions {
     /// Optional pointer to a `String` to use for capturing the command's output.
+    ///
+    /// @important: this option cannot be paired with a non-null `async_pid`.
     String* output_string;
     /// Optional pointer to a `ProcessID` to set when the command shouldn't block
     /// immediately. The `ProcessID` value can later be waited on via `proc_wait`.
+    ///
+    /// @important: this option cannot be paired with either a non-null `output_string` or
+    /// a true `silence_output` value.
     ProcessID* async_pid;
+    /// Whether to consume and "silence" the standard output and error streams.
+    ///
+    /// @important: this option cannot be paired with a non-null `async_pid`.
+    b32 silence_output;
 };
 typedef struct CommandOptions CommandOptions;
 
