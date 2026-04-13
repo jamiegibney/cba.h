@@ -1009,6 +1009,9 @@ CBA_DEF b32 str_parse_to_i64(String str, i64* dest);
 /// Attempts to parse the string `str` to a `f64` value, returning `true` if successful.
 CBA_DEF b32 str_parse_to_f64(String str, f64* dest);
 
+// @todo: docs
+CBA_DEF b32 str_chop_up_to_delim(String* src, String* dest, char delim);
+
 /// Allocates and returns a null-terminated string containing the data of the provided string.
 CBA_DEF char* str_to_cstr(String str);
 
@@ -3520,6 +3523,25 @@ CBA_DEF b32 str_parse_to_f64(String str, f64* dest) {
     }
 
     return result;
+}
+
+CBA_DEF b32 str_chop_up_to_delim(String* src, String* dest, char delim) {
+  b32 result = false;
+
+  for (usize i = 0; i < src->len; ++i) {
+    if (src->data[i] == delim) {
+      dest->data = src->data;
+      dest->len  = i;
+
+      src->data += i + 1;
+      src->len  -= i + 1;
+
+      result = true;
+      break;
+    }
+  }
+
+  return result;
 }
 
 CBA_DEF char* str_to_cstr(String str) {
