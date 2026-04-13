@@ -523,7 +523,7 @@ typedef struct Arena Arena;
 /// UTF-8 encoded string type.
 struct String {
     /// Pointer to the string's data.
-    u8* data;
+    char* data;
     /// Number of bytes used in the string.
     usize len;
     /// Total number of bytes allocated to the string.
@@ -773,8 +773,8 @@ CBA_DEF i32 __proc_wait_va(usize n, ...);
 
 // @mark: string
 
-#define strl(literal) ((String) { .data = (u8*)(literal), .len = sizeof(literal) - 1, .cap = sizeof(literal) })
-#define sfmt(s) (int)((s).len), (char*)((s).data)
+#define strl(literal) ((String) { .data = (char*)(literal), .len = sizeof(literal) - 1, .cap = sizeof(literal) })
+#define sfmt(s) (int)((s).len), (const char*)((s).data)
 #define stok "`%.*s`"
 
 /// Clears the string (sets its length to 0), and zeroes its memory.
@@ -1229,8 +1229,8 @@ CBA_DEF void __cba_rebuild(int argc, char** argv, const char* source_path, ...) 
     String old_binary_path = str_copy(binary_path);
     str_append_cstr(&old_binary_path, ".bak");
     
-    const char* binary_path_cstr = (char*)binary_path.data;
-    const char* old_binary_path_cstr = (char*)old_binary_path.data;
+    const char* binary_path_cstr = binary_path.data;
+    const char* old_binary_path_cstr = old_binary_path.data;
 
     // @jcg: try to remove a previously backed-up executable. It doesn't really matter if
     // it fails - this just helps to keep the file tree a little cleaner.
@@ -2058,7 +2058,7 @@ CBA_DEF ProcessID proc_start(Command cmd, FileDescriptor output_fd) {
     verbose_print("win32 flattened command: " stok, sfmt(flattened));
     b32 success = CreateProcessA(
         NULL,
-        (char*)flattened.data,
+        flattened.data,
         NULL,
         NULL,
         true,
@@ -2227,7 +2227,7 @@ CBA_DEF void str_clear(String* str) {
 
 CBA_DEF String str_alloc(void) {
     String result = {
-        .data = alloc_bytes(CBA_DEFAULT_STRING_CAPACITY),
+        .data = alloc_array(CBA_DEFAULT_STRING_CAPACITY, char),
         .len = 0,
         .cap = CBA_DEFAULT_STRING_CAPACITY - 1,
     };
@@ -2237,7 +2237,7 @@ CBA_DEF String str_alloc(void) {
 
 CBA_DEF String str_alloc_with_cap(usize cap) {
     String result = {
-        .data = alloc_bytes(cap),
+        .data = alloc_array(cap, char),
         .len = 0,
         .cap = cap - 1,
     };
@@ -2258,10 +2258,10 @@ CBA_DEF String str_sprintf(const char* fmt, ...) {
     // as above, but will append a null-terminator anyway when used as below - hence the
     // cap + 1 for the allocation.
     usize cap = max(len, CBA_DEFAULT_STRING_CAPACITY);
-    result.data = alloc_bytes(cap + 1);
+    result.data = alloc_array(cap + 1, char);
     result.len = len;
     result.cap = cap;
-    vsnprintf((char*)result.data, len + 1, fmt, args);
+    vsnprintf(result.data, len + 1, fmt, args);
 
     va_end(args);
 
@@ -2276,7 +2276,7 @@ CBA_DEF String str_from_cstr(const char* cstr) {
         // @jcg: one extra byte is allocated so that the string is compatible with
         // c-strings, as it'll technically have a null-terminator. This avoids some
         // annoying issues when dealing with APIs that expect null-terminated strings.
-        .data = alloc_bytes(cap),
+        .data = alloc_array(cap, char),
         .len = len,
         .cap = cap - 1,
     };
@@ -2290,7 +2290,7 @@ CBA_DEF String str_from_chars(char* buffer, usize count) {
     usize cap = max(count, CBA_DEFAULT_STRING_CAPACITY);
 
     String result = {
-        .data = alloc_bytes(cap + 1),
+        .data = alloc_array(cap + 1, char),
         .len = count,
         .cap = cap,
     };
@@ -2311,7 +2311,7 @@ CBA_DEF String str_from_file(const char* file_path) {
     fseek(f, 0, SEEK_SET);
 
     if (len) {
-        result.data = alloc_bytes(len + 1);
+        result.data = alloc_array(len + 1, char);
         result.len = len;
         result.cap = len;
 
@@ -2328,9 +2328,9 @@ CBA_DEF String str_from_cwd(void) {
     String result = str_alloc_with_cap(CBA_MAX_PATH);
 
 #if CBA_WINDOWS
-    char* cwd = _getcwd((char*)result.data, CBA_MAX_PATH);
+    char* cwd = _getcwd(result.data, CBA_MAX_PATH);
 #else
-    char* cwd = getcwd((char*)result.data, CBA_MAX_PATH);
+    char* cwd = getcwd(result.data, CBA_MAX_PATH);
 #endif
 
     assert(cwd, "failed to obtain current working directory");
@@ -2434,7 +2434,7 @@ CBA_DEF String str_path_to_absolute(String str) {
     assert(str.data[str.len] == '\0', "string is not null-terminated");
 
 #if CBA_WINDOWS
-    DWORD bytes = GetFullPathNameA((char*)str.data, CBA_MAX_PATH, (char*)result.data, NULL);
+    DWORD bytes = GetFullPathNameA(str.data, CBA_MAX_PATH, result.data, NULL);
 
     if (!bytes) {
         verbose_print("failed to get absolute path name from " stok ": %s", sfmt(str), _os_error());
@@ -2444,7 +2444,7 @@ CBA_DEF String str_path_to_absolute(String str) {
 #else
     assert(str.len < CBA_MAX_PATH, "input path length exceeds PATH_MAX");
 
-    char* p = realpath((char*)str.data, (char*)result.data);
+    char* p = realpath(str.data, result.data);
 
     if (!p) {
         if ((str.len > 0) && (str.data[0] == CBA_PATH_SEPARATOR)) {
@@ -2465,7 +2465,7 @@ CBA_DEF String str_path_to_absolute(String str) {
         }
     }
     else {
-        result.len = strlen((char*)result.data);
+        result.len = strlen(result.data);
     }
 #endif
 
@@ -2523,7 +2523,7 @@ CBA_DEF StringArray str_to_directory_entries(String path, b32 include_directory_
             str_append_null(&tmp);
         }
 
-        file = FindFirstFileA((char*)tmp.data, &find_data);
+        file = FindFirstFileA(tmp.data, &find_data);
     }
     end_temp_memory();
 
@@ -2613,7 +2613,7 @@ CBA_DEF String str_path_copy_pwd(String str) {
 
 CBA_DEF String str_copy(String str) {
     String result = {
-        .data = alloc_bytes(str.cap + 1),
+        .data = alloc_array(str.cap + 1, char),
         .len = str.len,
         .cap = str.cap,
     };
@@ -2655,7 +2655,7 @@ CBA_DEF void str_append_char(String* str, char ch) {
            "tried to exceed string capacity (cap: %zu, len: %zu)",
            str->cap, str->len);
 
-    str->data[str->len] = (u8)ch;
+    str->data[str->len] = ch;
     str->len += 1;
 }
 
@@ -2700,7 +2700,7 @@ CBA_DEF void str_appendf(String* str, const char* fmt, ...) {
            "tried to exceed string capacity (cap: %zu, len: %zu, appending: %i)",
            str->cap, str->len, len);
 
-    vsnprintf((char*)(str->data + str->len), len + 1, fmt, args);
+    vsnprintf(str->data + str->len, len + 1, fmt, args);
 
     va_end(args);
 }
@@ -2945,7 +2945,7 @@ CBA_DEF b32 str_ends_with(String str, const char* cstr) {
     usize len = (usize)strlen(cstr);
 
     if (len <= str.len) {
-        u8* ptr = str.data + (str.len - len);
+        u8* ptr = (u8*)(str.data + (str.len - len));
         result = memcmp(ptr, cstr, len) == 0;
     }
 
@@ -2961,8 +2961,8 @@ CBA_DEF b32 str_find_first_of_any(String haystack, const char* needles, usize co
 
     for (usize i = 0; i < haystack.len; ++i) {
         for (usize ii = 0; ii < count; ++ii) {
-            u8 a = haystack.data[i];
-            u8 b = needles[ii];
+            char a = haystack.data[i];
+            char b = needles[ii];
 
             if ((a == b) || (!case_sensitive && is_alpha(a) && is_alpha(b) && ((a ^ 0x20) == b))) {
                 result = true;
@@ -2992,8 +2992,8 @@ CBA_DEF b32 str_find_last_of_any(String haystack, const char* needles, usize cou
         usize idx = haystack.len - i - 1;
 
         for (usize ii = 0; ii < count; ++ii) {
-            u8 a = haystack.data[idx];
-            u8 b = needles[ii];
+            char a = haystack.data[idx];
+            char b = needles[ii];
 
             if ((a == b) || (!case_sensitive && is_alpha(a) && is_alpha(b) && ((a ^ 0x20) == b))) {
                 result = true;
@@ -3032,8 +3032,8 @@ CBA_DEF b32 str_find_first_other(String haystack, String needle, b32 case_sensit
             b32 mismatch = false;
 
             for (usize i = 0; i < needle.len; ++i) {
-                u8 a = haystack.data[off + i];
-                u8 b = needle.data[i];
+                char a = haystack.data[off + i];
+                char b = needle.data[i];
 
                 if (case_sensitive || !is_alpha(a) || !is_alpha(b)) {
                     mismatch = a != b;
@@ -3074,8 +3074,8 @@ CBA_DEF b32 str_find_last_other(String haystack, String needle, b32 case_sensiti
             b32 mismatch = false;
 
             for (usize i = 0; i < needle.len; ++i) {
-                u8 a = haystack.data[off + i];
-                u8 b = needle.data[i];
+                char a = haystack.data[off + i];
+                char b = needle.data[i];
 
                 if (case_sensitive || !is_alpha(a) || !is_alpha(b)) {
                     mismatch = a != b;
@@ -3202,8 +3202,8 @@ CBA_DEF b32 str_find_first_other_from(String haystack, String needle, usize from
             b32 mismatch = false;
 
             for (usize i = from; i < needle.len; ++i) {
-                u8 a = haystack.data[off + i];
-                u8 b = needle.data[i];
+                char a = haystack.data[off + i];
+                char b = needle.data[i];
 
                 if (case_sensitive || !is_alpha(a) || !is_alpha(b)) {
                     mismatch = a != b;
@@ -3245,8 +3245,8 @@ CBA_DEF b32 str_find_last_other_from(String haystack, String needle, usize from,
             b32 mismatch = false;
 
             for (usize i = from; i < needle.len; ++i) {
-                u8 a = haystack.data[off + i];
-                u8 b = needle.data[i];
+                char a = haystack.data[off + i];
+                char b = needle.data[i];
 
                 if (case_sensitive || !is_alpha(a) || !is_alpha(b)) {
                     mismatch = a != b;
@@ -3325,8 +3325,8 @@ CBA_DEF u64 str_count_others(String haystack, String needle, b32 case_sensitive)
             b32 mismatch = false;
 
             for (usize i = 0; i < needle.len; ++i) {
-                u8 a = haystack.data[off + i];
-                u8 b = needle.data[i];
+                char a = haystack.data[off + i];
+                char b = needle.data[i];
 
                 if (case_sensitive || !is_alpha(a) || !is_alpha(b)) {
                     mismatch = a != b;
@@ -3780,7 +3780,7 @@ CBA_DEF void cmd_append_split(Command* cmd, const char* args) {
     usize final_len = args_str.len - next_append_pos;
 
     if (final_len) {
-        u8 final = args_str.data[args_str.len - 1];
+        char final = args_str.data[args_str.len - 1];
         if (final == '\'' || final == '\"') {
             final_len -= 1;
         }
@@ -3910,12 +3910,12 @@ CBA_DEF String cmd_flatten_with_delims(Command cmd, char delim) {
 
 CBA_DEF char* cmd_flatten_to_cstr(Command cmd) {
     String result = cmd_flatten(cmd);
-    return (char*)result.data;
+    return result.data;
 }
 
 CBA_DEF char* cmd_flatten_to_cstr_with_delims(Command cmd, char delim) {
     String result = cmd_flatten_with_delims(cmd, delim);
-    return (char*)result.data;
+    return result.data;
 }
 
 #endif // CBA_IMPLEMENTATION
