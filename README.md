@@ -95,6 +95,7 @@ allocator, file operations, string operations, and more.
 ## Todo
 
 - [x] Flesh out Windows support
+- [ ] `CBA_REBUILD_COMMAND` can be in terms of the `CBA_COMPILER_*` macros
 - [ ] API document (perhaps with a tool to extract doc comments)
 - [ ] Ensure that either path separator is supported on all platforms?
 - [ ] Dynamic array (and perhaps a #define for enabling dynamic allocation)
