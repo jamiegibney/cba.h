@@ -908,6 +908,7 @@ CBA_DEF void str_replace_others(String* str, String from, String to);
 /// `to` C-string.
 CBA_DEF void str_replace_cstrs(String* str, const char* from, const char* to);
 
+// @todo: not working?
 /// Trims all characters in the null-terminated `delims` C-string from the start and end
 /// of the provided `string`.
 CBA_DEF void str_trim_chars(String* str, const char* delims);
@@ -915,7 +916,7 @@ CBA_DEF void str_trim_chars(String* str, const char* delims);
 /// includes: ' ', '\n', '\r', '\t', '\v', '\f'.
 CBA_DEF void str_trim_whitespace(String* str);
 
-// @todo: case-insensitive versions?
+// @todo: case-insensitive versions of below?
 
 /// Whether `a` is equivalent to `b`.
 CBA_DEF b32 str_eq(String a, String b);
