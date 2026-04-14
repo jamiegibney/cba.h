@@ -583,6 +583,10 @@ typedef struct Command Command;
 // @jcg: simply used as a marker.
 #define uninit
 
+#ifdef abs
+    #undef abs
+#endif
+
 #ifdef min
     #undef min
 #endif
