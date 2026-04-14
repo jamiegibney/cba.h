@@ -105,24 +105,30 @@
 #ifndef CBA_HEADER_GUARD
 #define CBA_HEADER_GUARD
 
+// @mark: overrideable defines
+
+/// Maximum capacity for arrays.
 #ifndef CBA_ARRAY_CAPACITY
     #define CBA_ARRAY_CAPACITY (256)
 #elif CBA_ARRAY_CAPACITY == 0
     #error array count must be greater than 0
 #endif
 
+/// Number of bytes to allocate to the global arena.
 #ifndef CBA_MEMORY_BLOCK_SIZE
     #define CBA_MEMORY_BLOCK_SIZE (64 << 20) // 64 MB
 #elif CBA_MEMORY_BLOCK_SIZE == 0
     #error memory block size must be greater than 0
 #endif
 
+/// Number of bytes to align arena allocations to.
 #ifndef CBA_ALIGNMENT
     #define CBA_ALIGNMENT (64)
 #elif CBA_ALIGNMENT == 0
     #error memory alignment must be greater than 0
 #endif
 
+/// Default (minumum) capacity for strings.
 #ifndef CBA_DEFAULT_STRING_CAPACITY
     #define CBA_DEFAULT_STRING_CAPACITY (512)
 #elif CBA_DEFAULT_STRING_CAPACITY == 0
@@ -281,12 +287,15 @@
     #endif
 #endif
 
+/// Prefix to use for `info` logging calls.
 #ifndef CBA_INFO_PREFIX
     #define CBA_INFO_PREFIX  "info"
 #endif
+/// Prefix to use for `warn` logging calls.
 #ifndef CBA_WARN_PREFIX
     #define CBA_WARN_PREFIX  "warn"
 #endif
+/// Prefix to use for `error` logging calls.
 #ifndef CBA_ERROR_PREFIX
     #define CBA_ERROR_PREFIX "error"
 #endif
@@ -361,7 +370,7 @@
 #define todo() panic("TODO: %s", __PRETTY_FUNCTION__)
 #define unreachable() CBA_UNREACHABLE; panic("unreachable code path was hit")
 
-#define CBA_DEF inline static
+#define CBA_DEF static inline
 
 #if defined(__cplusplus)
     #define CBA_LITERAL(type) type
@@ -571,7 +580,7 @@ typedef struct Command Command;
 
 // @mark: definitions
 
-/// @jcg: simply used as a marker.
+// @jcg: simply used as a marker.
 #define uninit
 
 #ifdef min
