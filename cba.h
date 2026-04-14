@@ -497,6 +497,31 @@ CBA_STATIC_ASSERT(sizeof(f64) == 8);
 #define F64_MAX     (1.7976931348623157e+308)
 #define F64_EPSILON (2.2204460492503131e-16)
 
+// @mark: version
+
+/// 64-bit packed representation of a version.
+///
+/// See `version_pack` and `version_unpack`.
+typedef u64 Version;
+
+/// Packs a `major`, `minor`, and `patch` value into a `Version`.
+///
+/// - The `major` value must be less than 2 ^ 8  (0 - 255)
+/// - The `minor` value must be less than 2 ^ 16 (0 - 65535)
+/// - The `patch` value must be less than 2 ^ 40 (0 - 1099511627775)
+#define version_pack(major, minor, patch) \
+  (Version)(((patch) & 0xFFFFFFFFFFllu) | (((minor) & 0xFFFFllu) << 40) | (((major) & 0xFFllu) << 56))
+
+/// Unpacks a `Version` into its `major`, `minor`, and `patch` components.
+///
+/// `patch` should be a 64-bit value.
+#define version_unpack(version, major, minor, patch)                           \
+  do {                                                                         \
+    *(major) = ((version) >> 56) & 0xFFllu;                                    \
+    *(minor) = ((version) >> 40) & 0xFFFFllu;                                  \
+    *(patch) = ((version)      ) & 0xFFFFFFFFFFllu;                            \
+  } while (0)
+
 // @mark: types
 
 /// A kind of file type.
@@ -937,11 +962,12 @@ CBA_DEF void str_replace_cstrs(String* str, const char* from, const char* to);
 
 // @todo: not working?
 /// Trims all characters in the null-terminated `delims` C-string from the start and end
-/// of the provided `string`.
-CBA_DEF void str_trim_chars(String* str, const char* delims);
+/// of the provided `string`, returning `true` if any characters were trimmed.
+CBA_DEF b32 str_trim_chars(String* str, const char* delims);
 /// Trims all whitespace characters from the start and end of the provided `string`. This
-/// includes: ' ', '\n', '\r', '\t', '\v', '\f'.
-CBA_DEF void str_trim_whitespace(String* str);
+/// includes: ' ', '\n', '\r', '\t', '\v', '\f', returning `true` if any characters were
+/// trimmed.
+CBA_DEF b32 str_trim_whitespace(String* str);
 
 // @todo: case-insensitive versions of below?
 
@@ -1052,11 +1078,18 @@ CBA_DEF char* fmt_bytes(usize num_bytes);
 
 /// Returns a formatted pretty string of the amount of time represented by `nanos`.
 ///
-/// `unit_verbosity` describes how verbose units are:
+/// `verbosity` describes how verbose units are:
 /// - `0`: "ns",          "ms",           "s",       etc.
 /// - `1`: "nanos",       "millis",       "secs",    etc.
 /// - `2`: "nanoseconds", "milliseconds", "seconds", etc.
-CBA_DEF char* fmt_time(u64 nanos, u8 unit_verbosity);
+CBA_DEF char* fmt_time(u64 nanos, u8 verbosity);
+
+/// Returns a formatted pretty string of a `Version`.
+///
+/// For example:
+/// Version v = version_pack(1, 2, 345);
+/// print("%s", fmt_version(v)); // "1.2.345"
+CBA_DEF const char* fmt_version(Version v);
 
 // @mark: string array
 
@@ -1449,7 +1482,15 @@ static inline FileDescriptor _open_fd_for_read_write(const char* path) {
     attr.nLength = sizeof(SECURITY_ATTRIBUTES);
     attr.bInheritHandle = TRUE;
 
-    HANDLE fd = CreateFileA(path, GENERIC_WRITE | GENERIC_READ, 0, &attr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE fd = CreateFileA(
+        path,
+        GENERIC_WRITE | GENERIC_READ,
+        0,
+        &attr,
+        CREATE_ALWAYS,
+        FILE_ATTRIBUTE_NORMAL,
+        NULL
+    );
 
     if (fd != INVALID_HANDLE) {
         result = (FileDescriptor)fd;
@@ -2884,8 +2925,8 @@ CBA_DEF void str_replace_cstrs(String* str, const char* from, const char* to) {
 
     b32 left_shift = to_len < from_len;
     usize shift_amount = left_shift
-                         ? (from_len - to_len)
-                         : (to_len - from_len);
+                             ? (from_len - to_len)
+                             : (to_len - from_len);
 
     usize pos = 0;
 
@@ -2918,47 +2959,91 @@ CBA_DEF void str_replace_cstrs(String* str, const char* from, const char* to) {
     }
 }
 
-CBA_DEF void str_trim_chars(String* str, const char* delims) {
-    if (!str->len) return;
+// CBA_DEF void str_trim_chars(String* str, const char* delims) {
+//     if (!str->len) return;
+//
+//     usize start = 0;
+//     usize end = str->len - 1;
+//     usize num_delims = (usize)strlen(delims);
+//
+//     while (start < str->len) {
+//         b32 found = false;
+//
+//         for (usize d = 0; d < num_delims; ++d) {
+//             if ((char)str->data[start] == delims[d]) {
+//                 found = true;
+//                 break;
+//             }
+//         }
+//
+//         if (!found) break;
+//         start += 1;
+//     }
+//
+//     while (end > start) {
+//         b32 found = false;
+//
+//         for (usize d = 0; d < num_delims; ++d) {
+//             if ((char)str->data[end] == delims[d]) {
+//                 found = true;
+//                 break;
+//             }
+//
+//             if (!found) break;
+//             end -= 1;
+//         }
+//     }
+//
+//     str->data += start;
+//     str->len = end - start + 1;
+// }
 
-    usize start = 0;
-    usize end = str->len - 1;
+CBA_DEF b32 str_trim_chars(String* str, const char* delims) {
+    b32 result = false;
+
+    if (!str->len) return false;
+
     usize num_delims = (usize)strlen(delims);
 
-    while (start < str->len) {
+    isize start = 0;
+    isize end = str->len - 1;
+
+    for (; start < (isize)str->len; ++start) {
         b32 found = false;
 
-        for (usize d = 0; d < num_delims; ++d) {
-            if ((char)str->data[start] == delims[d]) {
+        for (usize c = 0; c < num_delims; ++c) {
+            if (str->data[start] == delims[c]) {
                 found = true;
+                result = true;
                 break;
             }
         }
 
         if (!found) break;
-        start += 1;
     }
 
-    while (end > start) {
+    for (; end > start; --end) {
         b32 found = false;
 
-        for (usize d = 0; d < num_delims; ++d) {
-            if ((char)str->data[end] == delims[d]) {
+        for (usize c = 0; c < num_delims; ++c) {
+            if (str->data[end] == delims[c]) {
                 found = true;
+                result = true;
                 break;
             }
-
-            if (!found) break;
-            end -= 1;
         }
+
+        if (!found) break;
     }
 
     str->data += start;
     str->len = end - start + 1;
+
+    return result;
 }
 
-CBA_DEF void str_trim_whitespace(String* str) {
-    str_trim_chars(str, CBA_WHITESPACE_CHARS);
+CBA_DEF b32 str_trim_whitespace(String* str) {
+    return str_trim_chars(str, CBA_WHITESPACE_CHARS);
 }
 
 CBA_DEF b32 str_eq(String a, String b) {
@@ -3604,7 +3689,7 @@ CBA_DEF char* fmt_bytes(usize num_bytes) {
     return result;
 }
 
-CBA_DEF char* fmt_time(u64 nanos, u8 unit_verbosity) {
+CBA_DEF char* fmt_time(u64 nanos, u8 verbosity) {
     uninit char* result;
 
     const u64 MICRO = 1000;
@@ -3613,27 +3698,34 @@ CBA_DEF char* fmt_time(u64 nanos, u8 unit_verbosity) {
     const u64 MIN   = 60000000000;
 
     if (nanos < MICRO) {
-        const char* unit = unit_verbosity == 0 ? "ns" : (unit_verbosity == 1 ? "nanos" : "nanoseconds");
+        const char* unit = verbosity == 0 ? "ns" : (verbosity == 1 ? "nanos" : "nanoseconds");
         result = alloc_sprintf("%llu %s", nanos, unit);
     }
     else if (nanos < MILLI) {
-        const char* unit = unit_verbosity == 0 ? "µs" : (unit_verbosity == 1 ? "micros" : "microseconds");
+        const char* unit = verbosity == 0 ? "µs" : (verbosity == 1 ? "micros" : "microseconds");
         result = alloc_sprintf("%.3lf %s", (f64)nanos * 1e-3, unit);
     }
     else if (nanos < SEC) {
-        const char* unit = unit_verbosity == 0 ? "ms" : (unit_verbosity == 1 ? "millis" : "milliseconds");
+        const char* unit = verbosity == 0 ? "ms" : (verbosity == 1 ? "millis" : "milliseconds");
         result = alloc_sprintf("%.3lf %s", (f64)nanos * 1e-6, unit);
     }
     else if (nanos < MIN) {
-        const char* unit = unit_verbosity == 0 ? "s" : (unit_verbosity == 1 ? "secs" : "seconds");
+        const char* unit = verbosity == 0 ? "s" : (verbosity == 1 ? "secs" : "seconds");
         result = alloc_sprintf("%.3lf %s", (f64)nanos * 1e-9, unit);
     }
     else {
-        const char* unit = unit_verbosity == 0 ? "m" : (unit_verbosity == 1 ? "mins" : "minutes");
+        const char* unit = verbosity == 0 ? "m" : (verbosity == 1 ? "mins" : "minutes");
         result = alloc_sprintf("%.3lf %s", (f64)nanos * (60.0 * 1e-9), unit);
     }
 
     return result;
+}
+
+CBA_DEF const char* fmt_version(Version v) {
+  uninit u64 major, minor, patch;
+  version_unpack(v, &major, &minor, &patch);
+
+  return alloc_sprintf("%llu.%llu.%llu", major, minor, patch);
 }
 
 
