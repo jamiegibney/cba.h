@@ -96,13 +96,9 @@ allocator, file operations, string operations, and more.
 
 - [x] Flesh out Windows support
 - [ ] Auto-doc tool
-- [ ] Fix string trim functions
 - [ ] New string functions:
-    - [ ] Chop left/right until char
-    - [ ] Chop left/right until other/cstr
-    - [ ] `str_slice_lshift` and `str_slice_rshift` - for moving a slice/view
     - [ ] String split by char/cstr/other (into `StringArray`)
-    - [ ] Split lines
+    - [ ] Chop right/back until char/other/cstr
 - [ ] `CBA_REBUILD_COMMAND` can be in terms of the `CBA_COMPILER_*` macros
 - [ ] `CBA_COMPILER_OPTIMIZE` flag?
 - [ ] Ensure that either path separator is supported on all platforms?
