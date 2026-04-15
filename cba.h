@@ -410,12 +410,14 @@
     #define INVALID_HANDLE INVALID_HANDLE_VALUE
     #define CBA_MAX_PATH MAX_PATH
     #define CBA_PATH_SEPARATOR '\\'
+    #define CBA_LINE_ENDING "\r\n"
 #else
     typedef int ProcessID;
     typedef int FileDescriptor;
     #define INVALID_HANDLE (-1)
     #define CBA_MAX_PATH PATH_MAX
     #define CBA_PATH_SEPARATOR '/'
+    #define CBA_LINE_ENDING "\n"
 #endif
 
 #define CBA_WHITESPACE_CHARS " \t\n\r\v\f"
@@ -863,8 +865,24 @@ CBA_DEF String str_from_cwd(void);
 /// file.
 CBA_DEF b32 str_write_to_file(String s, const char* path, b32 append);
 
-/// Creates a "slice" of the provided `str`, with the provided `start` position and `len`.
+/// Creates a "slice" of the provided `String`, with the provided `start` position and `len`.
 CBA_DEF String str_slice(String str, usize start, usize len);
+/// "Shrinks" the provided `String` by `shift` elements from the left.
+///
+/// For example:
+/// ```
+/// String s = strl("abcde");
+/// str_shrink_left(&s, 2); // -> becomes "cde"
+/// ```
+CBA_DEF void str_shrink_left(String* str, usize shift);
+/// "Shrinks" the provided `String` by `shift` elements from the right.
+///
+/// For example:
+/// ```
+/// String s = strl("abcde");
+/// str_shrink_right(&s, 2); // -> becomes "abc"
+/// ```
+CBA_DEF void str_shrink_right(String* str, usize shift);
 
 /// Returns a slice of the provided `str` which includes only the file name of a full file
 /// path and optionally its extension. If there is no root path or extension, the original
@@ -960,7 +978,6 @@ CBA_DEF void str_replace_others(String* str, String from, String to);
 /// `to` C-string.
 CBA_DEF void str_replace_cstrs(String* str, const char* from, const char* to);
 
-// @todo: not working?
 /// Trims all characters in the null-terminated `delims` C-string from the start and end
 /// of the provided `string`, returning `true` if any characters were trimmed.
 CBA_DEF b32 str_trim_chars(String* str, const char* delims);
@@ -968,6 +985,22 @@ CBA_DEF b32 str_trim_chars(String* str, const char* delims);
 /// includes: ' ', '\n', '\r', '\t', '\v', '\f', returning `true` if any characters were
 /// trimmed.
 CBA_DEF b32 str_trim_whitespace(String* str);
+
+/// Splits the provided `String` by `delim`, returning an array of the separated strings.
+/// The `delim` character will not be included in any of the resulting strings.
+///
+/// If no delimiters are found, the resulting array will simply contain the original
+/// string.
+CBA_DEF StringArray str_split_by(String str, char delim);
+/// Splits the provided `String` by newline characters, returning an array of the
+/// separated lines. No newline characters will not be included in the resulting strings.
+///
+/// This function considers `\r\n` sequences to be newlines, and will omit them from the
+/// results.
+///
+/// If no newlines are found, the resulting array will simply contain the original
+/// string.
+CBA_DEF StringArray str_split_lines(String str);
 
 // @todo: case-insensitive versions of below?
 
@@ -1026,27 +1059,33 @@ CBA_DEF b32 str_find_last_cstr(String haystack, const char* needle, b32 case_sen
 
 /// Whether `needle` could be found in `haystack`, starting the search at the `from` index
 /// and progressing forwards. When `where` is non-NULL, it is set to the index of the
-/// first matching character, if found.
+/// first matching character, if found. When `case_sensitive` is false, case is
+/// ignored for alphabetic characters.
 CBA_DEF b32 str_find_first_char_from(String haystack, char needle, usize from, usize* where);
 /// Whether `needle` could be found in `haystack`, starting the search at the `from` index
 /// and progressing backwards. When `where` is non-NULL, it is set to the index of the
-/// last matching character, if found.
+/// last matching character, if found. When `case_sensitive` is false, case is
+/// ignored for alphabetic characters.
 CBA_DEF b32 str_find_last_char_from(String haystack, char needle, usize from, usize* where);
 /// Whether `needle` could be found in `haystack`, starting the search at the `from` index
 /// and progressing forwards. When `where` is non-NULL, it is set to the index of the
-/// first matching character, if found.
+/// first matching character, if found. When `case_sensitive` is false, case is
+/// ignored for alphabetic characters.
 CBA_DEF b32 str_find_first_other_from(String haystack, String needle, usize from, b32 case_sensitive, usize* where);
 /// Whether `needle` could be found in `haystack`, starting the search at the `from` index
 /// and progressing backwards. When `where` is non-NULL, it is set to the index of the
-/// last matching character, if found.
+/// last matching character, if found. When `case_sensitive` is false, case is
+/// ignored for alphabetic characters.
 CBA_DEF b32 str_find_last_other_from(String haystack, String needle, usize from, b32 case_sensitive, usize* where);
 /// Whether `needle` could be found in `haystack`, starting the search at the `from` index
 /// and progressing forwards. When `where` is non-NULL, it is set to the index of the
-/// first matching character, if found.
+/// first matching character, if found. When `case_sensitive` is false, case is
+/// ignored for alphabetic characters.
 CBA_DEF b32 str_find_first_cstr_from(String haystack, const char* needle, usize from, b32 case_sensitive, usize* where);
 /// Whether `needle` could be found in `haystack`, starting the search at the `from` index
 /// and progressing backwards. When `where` is non-NULL, it is set to the index of the
-/// last matching character, if found.
+/// last matching character, if found. When `case_sensitive` is false, case is
+/// ignored for alphabetic characters.
 CBA_DEF b32 str_find_last_cstr_from(String haystack, const char* needle, usize from, b32 case_sensitive, usize* where);
 
 /// Returns the number of characters matching the `needle` char in the provided string.
@@ -1057,13 +1096,48 @@ CBA_DEF u64 str_count_cstrs(String haystack, const char* needle, b32 case_sensit
 /// Returns the number of matches with the `needle` string in the provided string.
 CBA_DEF u64 str_count_others(String haystack, String needle, b32 case_sensitive);
 
+/// Whether `haystack`, contains `needle`.
+///
+/// This function searches forwards: use `str_find_last_char` if you need to search from
+/// the end of the string.
+CBA_DEF b32 str_contains_char(String haystack, char needle);
+/// Whether `haystack`, contains `needle`. When `case_sensitive` is false, case is
+/// ignored for alphabetic characters.
+///
+/// This function searches forwards: use `str_find_last_cstr` if you need to search from
+/// the end of the string.
+CBA_DEF b32 str_contains_cstr(String haystack, const char* needle, b32 case_sensitive);
+/// Whether `haystack`, contains `needle`. When `case_sensitive` is false, case is
+/// ignored for alphabetic characters.
+///
+/// This function searches forwards: use `str_find_last_other` if you need to search from
+/// the end of the string.
+CBA_DEF b32 str_contains_other(String haystack, String needle, b32 case_sensitive);
+
 /// Attempts to parse the string `str` to a `i64` value, returning `true` if successful.
 CBA_DEF b32 str_parse_to_i64(String str, i64* dest);
 /// Attempts to parse the string `str` to a `f64` value, returning `true` if successful.
 CBA_DEF b32 str_parse_to_f64(String str, f64* dest);
 
-// @todo: docs
+/// Chops any characters in `src` which precede the first occurence of `ch`, and places
+/// the "chopped" characters into `dest`. If `ch` was found, this function returns true.
 CBA_DEF b32 str_chop_up_to_char(String* src, String* dest, char ch);
+/// Chops any characters in `src` which precede the first occurence of `cstr`, and places
+/// the "chopped" characters into `dest`. If `ch` was found, this function returns true.
+CBA_DEF b32 str_chop_up_to_cstr(String* src, String* dest, const char* cstr, b32 case_sensitive);
+/// Chops any characters in `src` which precede the first occurence of `cstr`, and places
+/// the "chopped" characters into `dest`. If `ch` was found, this function returns true.
+CBA_DEF b32 str_chop_up_to_other(String* src, String* dest, String other, b32 case_sensitive);
+
+// /// Chops any characters in `src` which precede the first occurence of `ch`, and places
+// /// the "chopped" characters into `dest`. If `ch` was found, this function returns true.
+// CBA_DEF b32 str_chop_back_to_char(String* src, String* dest, char ch);
+// /// Chops any characters in `src` which precede the first occurence of `cstr`, and places
+// /// the "chopped" characters into `dest`. If `ch` was found, this function returns true.
+// CBA_DEF b32 str_chop_back_to_cstr(String* src, String* dest, const char* cstr, b32 case_sensitive);
+// /// Chops any characters in `src` which precede the first occurence of `cstr`, and places
+// /// the "chopped" characters into `dest`. If `ch` was found, this function returns true.
+// CBA_DEF b32 str_chop_back_to_other(String* src, String* dest, String other, b32 case_sensitive);
 
 /// Allocates and returns a null-terminated string containing the data of the provided string.
 CBA_DEF char* str_to_cstr(String str);
@@ -1540,6 +1614,7 @@ static isize _read_fd(FileDescriptor fd, void* memory, usize bytes) {
     isize result = 0;
 
 #if CBA_WINDOWS
+    // @fixme: this doesn't always seem write to `memory`.
     uninit DWORD bytes_read;
     b32 success = ReadFile(fd, memory, (DWORD)bytes, &bytes_read, NULL);
 
@@ -2537,6 +2612,19 @@ CBA_DEF String str_slice(String str, usize start, usize len) {
     return result;
 }
 
+CBA_DEF void str_shrink_left(String* str, usize shift) {
+    assert(str->len >= shift, "shift of %zu exceeds string's length of %zu", shift, str->len);
+
+    str->data += shift;
+    str->len -= shift;
+}
+
+CBA_DEF void str_shrink_right(String* str, usize shift) {
+    assert(str->len >= shift, "shift of %zu exceeds string's length of %zu", shift, str->len);
+
+    str->len -= shift;
+}
+
 CBA_DEF String str_path_file_name(String str, b32 include_extension) {
     String result = str;
 
@@ -2959,45 +3047,6 @@ CBA_DEF void str_replace_cstrs(String* str, const char* from, const char* to) {
     }
 }
 
-// CBA_DEF void str_trim_chars(String* str, const char* delims) {
-//     if (!str->len) return;
-//
-//     usize start = 0;
-//     usize end = str->len - 1;
-//     usize num_delims = (usize)strlen(delims);
-//
-//     while (start < str->len) {
-//         b32 found = false;
-//
-//         for (usize d = 0; d < num_delims; ++d) {
-//             if ((char)str->data[start] == delims[d]) {
-//                 found = true;
-//                 break;
-//             }
-//         }
-//
-//         if (!found) break;
-//         start += 1;
-//     }
-//
-//     while (end > start) {
-//         b32 found = false;
-//
-//         for (usize d = 0; d < num_delims; ++d) {
-//             if ((char)str->data[end] == delims[d]) {
-//                 found = true;
-//                 break;
-//             }
-//
-//             if (!found) break;
-//             end -= 1;
-//         }
-//     }
-//
-//     str->data += start;
-//     str->len = end - start + 1;
-// }
-
 CBA_DEF b32 str_trim_chars(String* str, const char* delims) {
     b32 result = false;
 
@@ -3044,6 +3093,42 @@ CBA_DEF b32 str_trim_chars(String* str, const char* delims) {
 
 CBA_DEF b32 str_trim_whitespace(String* str) {
     return str_trim_chars(str, CBA_WHITESPACE_CHARS);
+}
+
+CBA_DEF StringArray str_split_by(String str, char delim) {
+    StringArray result = {0};
+
+    return result;
+}
+
+CBA_DEF StringArray str_split_lines(String str) {
+    StringArray result = {0};
+
+    String tmp = {0};
+
+    while (str_chop_up_to_char(&str, &tmp, '\n')) {
+        String s = str_copy(tmp);
+
+        if ((s.len > 1) && (s.data[s.len - 2] == '\r')) {
+            s.len -= 1;
+        }
+
+        str_arr_append_str(&result, s);
+
+        usize shift = 0;
+
+        while ((shift < str.len) && ((str.data[shift] == '\r') || (str.data[shift] == '\n'))) {
+            shift += 1;
+        }
+
+        str_shrink_left(&str, shift);
+    }
+
+    if (!result.count) {
+        str_arr_append_str(&result, str);
+    }
+
+    return result;
 }
 
 CBA_DEF b32 str_eq(String a, String b) {
@@ -3307,6 +3392,18 @@ CBA_DEF u64 str_count_chars(String haystack, char needle) {
     }
 
     return result;
+}
+
+CBA_DEF b32 str_contains_char(String haystack, char needle) {
+    return str_find_first_char(haystack, needle, NULL);
+}
+
+CBA_DEF b32 str_contains_cstr(String haystack, const char* needle, b32 case_sensitive) {
+    return str_find_first_cstr(haystack, needle, case_sensitive, NULL);
+}
+
+CBA_DEF b32 str_contains_other(String haystack, String needle, b32 case_sensitive) {
+    return str_find_first_other(haystack, needle, case_sensitive, NULL);
 }
 
 CBA_DEF b32 str_find_first_other_from(String haystack, String needle, usize from, b32 case_sensitive, usize* where) {
@@ -3644,9 +3741,60 @@ CBA_DEF b32 str_chop_up_to_char(String* src, String* dest, char ch) {
         if (src->data[i] == ch) {
             dest->data = src->data;
             dest->len = i;
+            dest->cap = i;
 
             src->data += i + 1;
             src->len -= i + 1;
+            src->cap -= i + 1;
+
+            result = true;
+            break;
+        }
+    }
+
+    return result;
+}
+
+CBA_DEF b32 str_chop_up_to_cstr(String* src, String* dest, const char* cstr, b32 case_sensitive) {
+    uninit b32 result;
+
+    begin_temp_memory();
+    {
+        String str = str_from_cstr(cstr);
+        result = str_chop_up_to_other(src, dest, str, case_sensitive);
+    }
+    end_temp_memory();
+
+    return result;
+}
+
+CBA_DEF b32 str_chop_up_to_other(String* src, String* dest, String other, b32 case_sensitive) {
+    b32 result = false;
+
+    assert(src->len >= other.len,
+           "other is too large for the source string (src len: %zu | other len: %zu)",
+           src->len, other.len);
+
+    usize iters = src->len - other.len;
+
+    for (usize i = 0; i < src->len; ++i) {
+        b32 matches = true;
+
+        for (usize ii = 0; ii < other.len; ++ii) {
+            if (src->data[i + ii] != other.data[ii]) {
+                matches = false;
+                break;
+            }
+        }
+
+        if (matches) {
+            dest->data = src->data;
+            dest->len = i;
+            dest->cap = i;
+
+            src->data += i + 1;
+            src->len -= i + 1;
+            src->cap -= i + 1;
 
             result = true;
             break;
