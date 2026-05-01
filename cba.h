@@ -73,8 +73,8 @@
     - CBA_[INFO/WARN/ERROR]_PREFIX    prefix to use for info/warn/error macros
     - CBA_MEMORY_BLOCK_SIZE           number of bytes to allocate to the global arena
     - CBA_ALIGNMENT                   number of bytes to align allocations to
-    - CBA_DEFAULT_STRING_CAPACITY     default (minimum) capacity for strings
-    - CBA_ARRAY_CAPACITY              maximum number of elements allocated to arrays
+    - CBA_MIN_STRING_CAPACITY         minimum capacity for strings
+    - CBA_MIN_ARRAY_CAPACITY          minimum capacity for string arrays and commands
     - CBA_NO_DYNAMIC_ALLOCATION       whether to disable dynamic (re)allocation and use fixed lengths
 
 
@@ -109,9 +109,9 @@
 // @mark: overrideable defines
 
 /// Maximum capacity for arrays.
-#ifndef CBA_ARRAY_CAPACITY
-    #define CBA_ARRAY_CAPACITY (256)
-#elif CBA_ARRAY_CAPACITY == 0
+#ifndef CBA_MIN_ARRAY_CAPACITY
+    #define CBA_MIN_ARRAY_CAPACITY (256)
+#elif CBA_MIN_ARRAY_CAPACITY == 0
     #error array count must be greater than 0
 #endif
 
@@ -129,10 +129,10 @@
     #error memory alignment must be greater than 0
 #endif
 
-/// Default (minumum) capacity for strings.
-#ifndef CBA_DEFAULT_STRING_CAPACITY
-    #define CBA_DEFAULT_STRING_CAPACITY (512)
-#elif CBA_DEFAULT_STRING_CAPACITY == 0
+/// Minumum capacity for strings.
+#ifndef CBA_MIN_STRING_CAPACITY
+    #define CBA_MIN_STRING_CAPACITY (512)
+#elif CBA_MIN_STRING_CAPACITY == 0
     #error min string capacity must be greater than 0
 #endif
 
@@ -1048,7 +1048,7 @@ CBA_DEF i32 __proc_wait_va(usize n, ...);
 /// Clears the string (sets its length to 0), and zeroes its memory.
 CBA_DEF void str_clear(String* str);
 
-/// Allocates an empty string with a capacity of `CBA_DEFAULT_STRING_CAPACITY` bytes.
+/// Allocates an empty string with a capacity of `CBA_MIN_STRING_CAPACITY` bytes.
 CBA_DEF String str_alloc(void);
 /// Allocates an empty string with `cap` bytes.
 CBA_DEF String str_alloc_with_cap(usize cap);
@@ -1502,7 +1502,7 @@ CBA_DEF char* cmd_flatten_to_cstr_with_delims(Command cmd, char delim);
     do {                                                                                                          \
         if ((new_cap) > (arr)->cap) {                                                                             \
             if (!(arr)->cap) {                                                                                    \
-                (arr)->cap = CBA_ARRAY_CAPACITY;                                                                  \
+                (arr)->cap = CBA_MIN_ARRAY_CAPACITY;                                                                  \
             }                                                                                                     \
             (arr)->cap = next_pow2(new_cap);                                                                      \
             (arr)->items = _DECLTYPE_CAST((arr)->items)realloc((arr)->items, (arr)->cap * sizeof(*(arr)->items)); \
@@ -2717,7 +2717,7 @@ CBA_DEF i32 __proc_wait_va(usize n, ...) {
 #ifdef CBA_NO_DYNAMIC_ALLOCATION
 CBA_DEF void _str_resize(String* str, usize new_len) {
     if (!str->cap) {
-        new_len = min(new_len, CBA_DEFAULT_STRING_CAPACITY);
+        new_len = min(new_len, CBA_MIN_STRING_CAPACITY);
 
         str->data = alloc_array(new_len, char);
         str->cap = new_len;
@@ -2730,7 +2730,7 @@ CBA_DEF void _str_resize(String* str, usize new_len) {
 }
 #else
 CBA_DEF void _str_resize(String* str, usize new_len) {
-    new_len = min(new_len, CBA_DEFAULT_STRING_CAPACITY);
+    new_len = min(new_len, CBA_MIN_STRING_CAPACITY);
 
     if (!str->cap) {
         str->data = (char*)calloc(new_len + 1, sizeof(char));
@@ -2754,7 +2754,7 @@ CBA_DEF void str_clear(String* str) {
 
 CBA_DEF String str_alloc(void) {
     String result = {0};
-    _str_resize(&result, CBA_DEFAULT_STRING_CAPACITY);
+    _str_resize(&result, CBA_MIN_STRING_CAPACITY);
 
     return result;
 }
@@ -2778,7 +2778,7 @@ CBA_DEF String str_sprintf(const char* fmt, ...) {
     // @jcg: in a nutshell, vsnprintf returns the length minus a null-terminator when used
     // as above, but will append a null-terminator anyway when used as below - hence the
     // cap + 1 for the allocation.
-    usize cap = max(len, CBA_DEFAULT_STRING_CAPACITY);
+    usize cap = max(len, CBA_MIN_STRING_CAPACITY);
     _str_resize(&result, cap);
     result.len = len;
     vsnprintf(result.data, len + 1, fmt, args);
@@ -4137,7 +4137,7 @@ CBA_DEF const char* fmt_version(Version v) {
 #ifdef CBA_NO_DYNAMIC_ALLOCATION
 CBA_DEF void _str_arr_resize(StringArray* arr, usize new_len) {
     if (!arr->cap) {
-        new_len = min(new_len, CBA_ARRAY_CAPACITY);
+        new_len = min(new_len, CBA_MIN_ARRAY_CAPACITY);
 
         arr->items = alloc_array(new_len, String);
         arr->cap = new_len;
@@ -4150,7 +4150,7 @@ CBA_DEF void _str_arr_resize(StringArray* arr, usize new_len) {
 }
 #else
 CBA_DEF void _str_arr_resize(StringArray* arr, usize new_len) {
-    new_len = min(new_len, CBA_ARRAY_CAPACITY);
+    new_len = min(new_len, CBA_MIN_ARRAY_CAPACITY);
         
     if (!arr->cap) {
         arr->items = (String*)calloc(new_len, sizeof(String));
@@ -4253,7 +4253,7 @@ CBA_DEF String str_arr_flatten_to_str(StringArray arr, const char* separator) {
 #ifdef CBA_NO_DYNAMIC_ALLOCATION
 CBA_DEF void _cmd_resize(Command* cmd, usize new_len) {
     if (!cmd->cap) {
-        new_len = min(new_len, CBA_ARRAY_CAPACITY);
+        new_len = min(new_len, CBA_MIN_ARRAY_CAPACITY);
 
         cmd->items = alloc_array(new_len, String);
         cmd->cap = new_len;
@@ -4266,7 +4266,7 @@ CBA_DEF void _cmd_resize(Command* cmd, usize new_len) {
 }
 #else
 CBA_DEF void _cmd_resize(Command* cmd, usize new_len) {
-    new_len = min(new_len, CBA_ARRAY_CAPACITY);
+    new_len = min(new_len, CBA_MIN_ARRAY_CAPACITY);
 
     if (!cmd->cap) {
         cmd->items = (String*)calloc(new_len, sizeof(String));
