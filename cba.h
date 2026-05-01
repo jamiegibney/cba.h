@@ -848,8 +848,8 @@ typedef struct Command Command;
 #define countof(x) ((sizeof(x)/sizeof(0[x])) / ((size_t)(!(sizeof(x) % sizeof(0[x])))))
 #define bstr(boolean) ((boolean) ? "yes" : "no")
 
-#define mem_zero(ptr, bytes) memset((ptr), 0, (bytes))
-#define mem_zero_array(ptr, count) mem_zero((ptr), (count) * sizeof((ptr)[0]))
+#define memz(ptr, bytes) memset((ptr), 0, (bytes))
+#define memz_array(ptr, count) memz((ptr), (count) * sizeof((ptr)[0]))
 
 #define streq(a, b)  (strcmp(a, b) == 0)
 #define strneq(a, b) (strcmp(a, b) != 0)
@@ -1716,7 +1716,7 @@ CBA_DEF void* arena_alloc(Arena* arena, usize size) {
 
     result = arena->base + arena->used + alignment_offset;
     arena->used += effective_size;
-    mem_zero(result, size);
+    memz(result, size);
 
     return result;
 }
@@ -2653,7 +2653,7 @@ CBA_DEF i32 __proc_wait_va(usize n, ...) {
 
 CBA_DEF void str_clear(String* str) {
     str->len = 0;
-    mem_zero(str->data, str->cap);
+    memz(str->data, str->cap);
 }
 
 CBA_DEF String str_alloc(void) {
@@ -3098,7 +3098,7 @@ CBA_DEF void str_lshift(String* str, usize start, usize shift) {
 
     str->len -= shift;
     // @jcg: required to retain a null-terminator after the string contents.
-    mem_zero(str->data + str->len, shift);
+    memz(str->data + str->len, shift);
 }
 
 CBA_DEF void str_rshift(String* str, usize start, usize shift) {
@@ -3118,7 +3118,7 @@ CBA_DEF void str_rshift(String* str, usize start, usize shift) {
         str->data[i] = str->data[i - shift];
     }
 
-    mem_zero(str->data + start, shift);
+    memz(str->data + start, shift);
     str->len = new_len;
 }
 
