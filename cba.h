@@ -1487,6 +1487,35 @@ CBA_DEF char* cmd_flatten_to_cstr(Command cmd);
 /// surrounded by `delim`.
 CBA_DEF char* cmd_flatten_to_cstr_with_delims(Command cmd, char delim);
 
+#ifdef __cplusplus
+    #define _DECLTYPE_CAST(x) (decltype(x))
+#else
+    #define _DECLTYPE_CAST(x)
+#endif
+
+#define da_reserve(arr, new_cap)                                                                                  \
+    do {                                                                                                          \
+        if ((new_cap) > (arr)->cap) {                                                                             \
+            if (!(arr)->cap) {                                                                                    \
+                (arr)->cap = CBA_ARRAY_CAPACITY;                                                                  \
+            }                                                                                                     \
+            (arr)->cap = next_pow2(new_cap);                                                                      \
+            (arr)->items = _DECLTYPE_CAST((arr)->items)realloc((arr)->items, (arr)->cap * sizeof(*(arr)->items)); \
+            assert((arr)->items, "failed to reallocate %zu elements for dynamic array", (arr)->cap);              \
+        }                                                                                                         \
+    } while (0)
+#define da_append(arr, element)                   \
+    do {                                          \
+        da_reserve((arr), (arr)->count + 1);      \
+        (arr)->items[(arr)->count++] = (element); \
+    } while (0)
+#define da_append_many(arr, elements, element_count)                                              \
+    do {                                                                                          \
+        da_reserve((arr), (arr)->count + (element_count));                                        \
+        memcpy((arr)->items + (arr)->count, (elements), (element_count) * sizeof(*(arr)->items)); \
+        (arr)->count += (element_count);                                                          \
+    } while (0)
+
 
 
 
