@@ -75,6 +75,7 @@
     - CBA_ALIGNMENT                   number of bytes to align allocations to
     - CBA_DEFAULT_STRING_CAPACITY     default (minimum) capacity for strings
     - CBA_ARRAY_CAPACITY              maximum number of elements allocated to arrays
+    - CBA_NO_DYNAMIC_ALLOCATION       whether to disable dynamic (re)allocation and use fixed lengths
 
 
     
@@ -770,6 +771,8 @@ struct StringArray {
     String* items;
     /// Number of items in the array.
     usize count;
+    /// Number of items allocated to the array.
+    usize cap;
 };
 typedef struct StringArray StringArray;
 
@@ -799,6 +802,8 @@ struct Command {
     String* items;
     /// Number of arguments in the command.
     usize count;
+    /// Number of arguments allocated to the command.
+    usize cap;
 };
 typedef struct Command Command;
 
@@ -2709,27 +2714,54 @@ CBA_DEF i32 __proc_wait_va(usize n, ...) {
 
 // @mark: strings
 
+#ifdef CBA_NO_DYNAMIC_ALLOCATION
+CBA_DEF void _str_resize(String* str, usize new_len) {
+    if (!str->cap) {
+        new_len = min(new_len, CBA_DEFAULT_STRING_CAPACITY);
+
+        str->data = alloc_array(new_len, char);
+        str->cap = new_len;
+    }
+
+    assert(new_len < str->cap,
+           "string capacity was exceeded (capacity: %zu, new length: %zu)",
+           str->cap,
+           new_len);
+}
+#else
+CBA_DEF void _str_resize(String* str, usize new_len) {
+    new_len = min(new_len, CBA_DEFAULT_STRING_CAPACITY);
+
+    if (!str->cap) {
+        str->data = (char*)calloc(new_len + 1, sizeof(char));
+        str->cap = new_len;
+    }
+
+    if (new_len > str->cap) {
+        usize new_cap = next_pow2(new_len) + 1;
+
+        str->data = (char*)realloc(str->data, new_cap * sizeof(char));
+        memz(str->data + str->cap, new_cap - str->cap);
+        str->cap = new_cap - 1;
+    }
+}
+#endif
+
 CBA_DEF void str_clear(String* str) {
     str->len = 0;
     memz(str->data, str->cap);
 }
 
 CBA_DEF String str_alloc(void) {
-    String result = {
-        .data = alloc_array(CBA_DEFAULT_STRING_CAPACITY, char),
-        .len = 0,
-        .cap = CBA_DEFAULT_STRING_CAPACITY - 1,
-    };
+    String result = {0};
+    _str_resize(&result, CBA_DEFAULT_STRING_CAPACITY);
 
     return result;
 }
 
 CBA_DEF String str_alloc_with_cap(usize cap) {
-    String result = {
-        .data = alloc_array(cap, char),
-        .len = 0,
-        .cap = cap - 1,
-    };
+    String result = {0};
+    _str_resize(&result, cap);
 
     return result;
 }
@@ -2747,9 +2779,8 @@ CBA_DEF String str_sprintf(const char* fmt, ...) {
     // as above, but will append a null-terminator anyway when used as below - hence the
     // cap + 1 for the allocation.
     usize cap = max(len, CBA_DEFAULT_STRING_CAPACITY);
-    result.data = alloc_array(cap + 1, char);
+    _str_resize(&result, cap);
     result.len = len;
-    result.cap = cap;
     vsnprintf(result.data, len + 1, fmt, args);
 
     va_end(args);
@@ -2759,32 +2790,22 @@ CBA_DEF String str_sprintf(const char* fmt, ...) {
 
 CBA_DEF String str_from_cstr(const char* cstr) {
     usize len = (usize)strlen(cstr);
-    usize cap = max(len + 1, CBA_DEFAULT_STRING_CAPACITY);
 
-    String result = {
-        // @jcg: one extra byte is allocated so that the string is compatible with
-        // c-strings, as it'll technically have a null-terminator. This avoids some
-        // annoying issues when dealing with APIs that expect null-terminated strings.
-        .data = alloc_array(cap, char),
-        .len = len,
-        .cap = cap - 1,
-    };
+    String result = {0};
+    _str_resize(&result, len);
 
     memcpy(result.data, cstr, len);
+    result.len = len;
 
     return result;
 }
 
 CBA_DEF String str_from_chars(char* buffer, usize count) {
-    usize cap = max(count, CBA_DEFAULT_STRING_CAPACITY);
-
-    String result = {
-        .data = alloc_array(cap + 1, char),
-        .len = count,
-        .cap = cap,
-    };
+    String result = {0};
+    _str_resize(&result, count);
 
     memcpy(result.data, buffer, count);
+    result.len = count;
 
     return result;
 }
@@ -2800,9 +2821,8 @@ CBA_DEF String str_from_file(const char* file_path) {
     fseek(f, 0, SEEK_SET);
 
     if (len) {
-        result.data = alloc_array(len + 1, char);
+        _str_resize(&result, len);
         result.len = len;
-        result.cap = len;
 
         usize bytes_read = (usize)fread(result.data, 1, len, f);
         assert(bytes_read > 0, "no bytes were read from \"%s\"", file_path);
@@ -3031,11 +3051,9 @@ CBA_DEF String str_path_copy_pwd(String str) {
 }
 
 CBA_DEF String str_copy(String str) {
-    String result = {
-        .data = alloc_array(str.cap + 1, char),
-        .len = str.len,
-        .cap = str.cap,
-    };
+    String result = {0};
+    _str_resize(&result, str.cap);
+    result.len = str.len;
 
     memcpy(result.data, str.data, str.len);
 
@@ -3043,19 +3061,14 @@ CBA_DEF String str_copy(String str) {
 }
 
 CBA_DEF void str_copy_into(String* dest, String source) {
-    assert(source.len <= dest->cap,
-           "insufficient capacity for string copy (cap: %zu, source len: %zu)",
-           dest->cap, source.len);
+    _str_resize(dest, source.len);
 
     memcpy(dest->data, source.data, source.len);
     dest->len = source.len;
 }
 
 CBA_DEF void str_append_null(String* str) {
-    assert(str->len < str->cap,
-           "tried to exceed string capacity (cap: %zu, len: %zu)",
-           str->cap, str->len);
-
+    _str_resize(str, str->len + 1);
     str->data[str->len] = 0;
     str->len += 1;
 }
@@ -3070,10 +3083,7 @@ CBA_DEF void str_append_line_ending(String* str) {
 }
 
 CBA_DEF void str_append_char(String* str, char ch) {
-    assert(str->len < str->cap,
-           "tried to exceed string capacity (cap: %zu, len: %zu)",
-           str->cap, str->len);
-
+    _str_resize(str, str->len + 1);
     str->data[str->len] = ch;
     str->len += 1;
 }
@@ -3081,28 +3091,19 @@ CBA_DEF void str_append_char(String* str, char ch) {
 CBA_DEF void str_append_cstr(String* str, const char* cstr) {
     usize len = (usize)strlen(cstr);
 
-    assert((str->len + len) <= str->cap,
-           "tried to exceed string capacity (cap: %zu, len: %zu, appending: %zu)",
-           str->cap, str->len, len);
-
+    _str_resize(str, str->len + len);
     memcpy(str->data + str->len, cstr, len);
     str->len += len;
 }
 
 CBA_DEF void str_append_chars(String* str, char* buffer, usize count) {
-    assert((str->len + count) <= str->cap,
-           "tried to exceed string capacity (cap: %zu, len: %zu, appending: %zu)",
-           str->cap, str->len, count);
-
+    _str_resize(str, str->len + count);
     memcpy(str->data + str->len, buffer, count);
     str->len += count;
 }
 
 CBA_DEF void str_append_other(String* str, String other) {
-    assert((str->len + other.len) <= str->cap,
-           "tried to exceed string capacity (cap: %zu, len: %zu, appending: %zu)",
-           str->cap, str->len, other.len);
-
+    _str_resize(str, str->len + other.len);
     memcpy(str->data + str->len, other.data, other.len);
     str->len += other.len;
 }
@@ -3114,11 +3115,7 @@ CBA_DEF void str_appendf(String* str, const char* fmt, ...) {
     int len = vsnprintf(NULL, 0, fmt, args);
     assert(len > 0, "failed to construct format string from \"%s\"", fmt);
 
-    // @jcg: see the str_sprintf implementation for an explanation of the + 1s here.
-    assert((str->len + len + 1) <= str->cap,
-           "tried to exceed string capacity (cap: %zu, len: %zu, appending: %i)",
-           str->cap, str->len, len);
-
+    _str_resize(str, str->len + len + 1);
     vsnprintf(str->data + str->len, len + 1, fmt, args);
 
     va_end(args);
@@ -4137,15 +4134,45 @@ CBA_DEF const char* fmt_version(Version v) {
 
 // @mark: string array
 
+#ifdef CBA_NO_DYNAMIC_ALLOCATION
+CBA_DEF void _str_arr_resize(StringArray* arr, usize new_len) {
+    if (!arr->cap) {
+        new_len = min(new_len, CBA_ARRAY_CAPACITY);
+
+        arr->items = alloc_array(new_len, String);
+        arr->cap = new_len;
+    }
+
+    assert(new_len < arr->cap,
+           "exceeded capacity of string array (capacity: %zu, new length: %zu)",
+           arr->cap,
+           new_len);
+}
+#else
+CBA_DEF void _str_arr_resize(StringArray* arr, usize new_len) {
+    new_len = min(new_len, CBA_ARRAY_CAPACITY);
+        
+    if (!arr->cap) {
+        arr->items = (String*)calloc(new_len, sizeof(String));
+        arr->cap = new_len;
+    }
+
+    if (new_len > arr->cap) {
+        usize new_cap = next_pow2(new_len);
+
+        arr->items = (String*)realloc(arr->items, new_cap * sizeof(String));
+        memz(arr->items + arr->cap, new_cap - arr->cap);
+        arr->cap = new_cap;
+    }
+}
+#endif
+
 CBA_DEF void str_arr_append_str(StringArray* arr, String str) {
     if (!arr->items) {
-        arr->items = alloc_array(CBA_ARRAY_CAPACITY, String);
         arr->count = 0;
     }
 
-    assert(arr->count < CBA_ARRAY_CAPACITY,
-           "tried to exceed maximum string count (current: %zu)",
-           arr->count);
+    _str_arr_resize(arr, arr->count + 1);
 
     arr->items[arr->count] = str;
     arr->count += 1;
@@ -4223,16 +4250,47 @@ CBA_DEF String str_arr_flatten_to_str(StringArray arr, const char* separator) {
 
 // @mark: commands
 
+#ifdef CBA_NO_DYNAMIC_ALLOCATION
+CBA_DEF void _cmd_resize(Command* cmd, usize new_len) {
+    if (!cmd->cap) {
+        new_len = min(new_len, CBA_ARRAY_CAPACITY);
+
+        cmd->items = alloc_array(new_len, String);
+        cmd->cap = new_len;
+    }
+
+    assert(new_len < cmd->cap,
+           "exceeded capacity of command (capacity: %zu, new length: %zu)",
+           cmd->cap,
+           new_len);
+}
+#else
+CBA_DEF void _cmd_resize(Command* cmd, usize new_len) {
+    new_len = min(new_len, CBA_ARRAY_CAPACITY);
+
+    if (!cmd->cap) {
+        cmd->items = (String*)calloc(new_len, sizeof(String));
+        cmd->cap = new_len;
+    }
+
+    if (new_len > cmd->cap) {
+        usize new_cap = next_pow2(new_len);
+
+        cmd->items = (String*)realloc(cmd->items, new_cap * sizeof(String));
+        memz(cmd->items + cmd->cap, new_cap - cmd->cap);
+        cmd->cap = new_cap;
+    }
+}
+#endif
+
 CBA_DEF void cmd_append_str(Command* cmd, String str) {
     if (!cmd->items) {
-        cmd->items = alloc_array(CBA_ARRAY_CAPACITY, String);
         cmd->count = 0;
     }
 
     assert(str.len, "cannot append empty string to command");
-    assert(cmd->count < CBA_ARRAY_CAPACITY,
-           "tried to exceed maximum command count (current: %zu)",
-           cmd->count);
+
+    _cmd_resize(cmd, cmd->count + 1);
 
     cmd->items[cmd->count] = str;
     cmd->count += 1;
