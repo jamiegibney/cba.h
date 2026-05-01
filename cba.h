@@ -908,6 +908,9 @@ CBA_DEF void wait_ms(u64 ms);
 /// Swaps `len_bytes` bytes between the memory at `a` and `b`.
 CBA_DEF void mem_swap(void* a, void* b, usize len_bytes);
 
+/// Returns the next power of two value for `x`.
+CBA_DEF usize next_pow2(usize x);
+
 // @mark: arena
 
 /// Statically-allocated arena memory block, assigned to the global arena.
@@ -1695,6 +1698,32 @@ CBA_DEF void mem_swap(void* a, void* b, usize len_bytes) {
         lhs += 1;
         rhs += 1;
     }
+}
+
+CBA_DEF usize next_pow2(usize x) {
+    uninit usize result;
+
+    if (x == 0) {
+        result = 1;
+    }
+    else {
+        if (is_pow2(x)) {
+            x += 1;
+        }
+
+        x -= 1;
+        x |= x >> 1;
+        x |= x >> 2;
+        x |= x >> 4;
+        x |= x >> 8;
+        x |= x >> 16;
+        x |= x >> 32;
+        x += 1;
+
+        result = x;
+    }
+
+    return result;
 }
 
 CBA_DEF void* arena_alloc(Arena* arena, usize size) {
