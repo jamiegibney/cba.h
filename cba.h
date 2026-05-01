@@ -81,12 +81,6 @@
     
     # Notes
 
-    - cba.h does not use dynamic allocations: it uses a single global arena with a
-      fixed-size memory block. You can use the following for allocations:
-        - alloc()         allocate an instance of a type
-        - alloc_bytes()   allocate a number of bytes
-        - alloc_array()   allocate a number of typed elements
-
     - You can print Strings with `print(stok, sfmt(the_string));`
         - stok   expands to "`%.*s`"
         - sfmt   expands to (int)str.len, (const char*)str.data
