@@ -2592,7 +2592,7 @@ CBA_DEF ProcessID proc_start(Command cmd, FileDescriptor output_fd) {
                 // it needs to be allocated permanently to outlive the child process.
                 char** arr = alloc_array(cmd.count + 1, char*);
                 for (usize i = 0; i < cmd.count; ++i) {
-                    arr[i] = alloc_array(cmd.items[i].len, char);
+                    arr[i] = alloc_array(cmd.items[i].len + 1, char);
                     memcpy(arr[i], cmd.items[i].data, cmd.items[i].len);
                 }
 
