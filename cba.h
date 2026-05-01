@@ -1,5 +1,5 @@
 /*  
-    cba.h | v1.1.0 | https://github.com/jamiegibney/cba.h
+    cba.h | v1.2.0 | https://github.com/jamiegibney/cba.h
   
     Single-header library for build recipes and general utilities in C.
 
@@ -4532,6 +4532,18 @@ CBA_DEF char* cmd_flatten_to_cstr_with_delims(Command cmd, char delim) {
 /*
     # Version history
 
+    - v1.2.0 (01 May 2026) (by @jamiegibney)
+        - Strings, StringArrays, and Commands now support dynamic allocation by default
+        - Added `CBA_NO_DYNAMIC_ALLOCATION` to opt out of dynamically-allocated strings and arrays
+        - Added da_append macros for dynamic arrays
+        - Added str split/chop/shrink functions
+        - Added next_pow2
+        - Added BIT_ and FIRST/LAST_BITS macros
+        - Added line ending macros
+        - Fixed the _seek_fd function on Windows
+        - Updated documentation
+        - Renamed CBA_DEFAULT_STRING_CAPACITY to CBA_MIN_STRING_CAPACITY
+        - Renamed CBA_ARRAY_CAPACITY to CBA_MIN_ARRAY_CAPACITY
     - v1.1.0 (13 Apr 2026) (by @jamiegibney)
         - Strings now store their data as char* for convenience
         - Updated directory entry function (now a "file" function)
