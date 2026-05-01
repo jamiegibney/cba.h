@@ -144,12 +144,12 @@
 #define CBA_X86 0
 #define CBA_ARM 0
 
-#if defined(__GNUC__)
-    #undef CBA_GCC
-    #define CBA_GCC 1
-#elif defined(__clang__)
+#if defined(__clang__)
     #undef CBA_CLANG
     #define CBA_CLANG 1
+#elif defined(__GNUC__)
+    #undef CBA_GCC
+    #define CBA_GCC 1
 #elif defined(_MSC_VER)
     #undef CBA_MSVC
     #define CBA_MSVC 1
