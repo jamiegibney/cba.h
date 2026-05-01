@@ -101,9 +101,6 @@ allocator, file operations, string operations, and more.
     - [ ] Chop right/back until char/other/cstr
 - [ ] `CBA_REBUILD_COMMAND` can be in terms of the `CBA_COMPILER_*` macros
 - [ ] `CBA_COMPILER_OPTIMIZE` flag?
-- [ ] Ensure that either path separator is supported on all platforms?
-- [ ] Dynamic array (and perhaps a #define for enabling dynamic allocation)
-    - Have a look at the `da_append` implementation in `nob.h`
 - [ ] Hash table/set
 - [ ] Automatic `compile_commands.json` generation?
 - [ ] Piping mechanism
