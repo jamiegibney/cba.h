@@ -909,7 +909,7 @@ typedef struct Command Command;
     #define CBA_COMPILER_OUTPUT(output) alloc_sprintf("/Fe:%s", output)
     #define CBA_COMPILER_COMMON_FLAGS "/W4", "/nologo", "/D_CRT_SECURE_NO_WARNINGS"
     #define CBA_COMPILER_DEBUG_FLAGS "/ZI", "/DDEBUG"
-    #define CBA_COMPILER_RELEASE_FLAGS "/O3", "/DNDEBUG"
+    #define CBA_COMPILER_RELEASE_FLAGS "/O2", "/DNDEBUG"
 #elif CBA_GCC
     #define CBA_COMPILER_C "gcc"
     #define CBA_COMPILER_CPP "g++"
