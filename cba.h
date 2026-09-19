@@ -5355,6 +5355,7 @@ CBA_DEF void _cmd_resize(Command* cmd, sz new_len)
         verbose_print("reallocating command to %zu elements", new_cap);
         String* new_data = alloc_array(new_cap, String);
         memcpy(new_data, cmd->items, cmd->count * isizeof(String));
+        cmd->items = new_data;
         cmd->cap = new_cap;
     }
 }
