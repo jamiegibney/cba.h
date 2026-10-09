@@ -198,7 +198,6 @@
     #error unsupported architecture
 #endif
 
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -441,6 +440,9 @@ typedef int32_t   b32;
 
 typedef float     f32;
 typedef double    f64;
+
+#define true  (1)
+#define false (0)
 
 #define isizeof(x) ((sz)sizeof(x))
 
@@ -1166,7 +1168,11 @@ CBA_DEF i32 __proc_wait_va(sz n, ...);
 // @mark: string
 
 /// Wraps a string literal with a `String`.
+#if CBA_WINDOWS
+#define strl(literal) { (char*)(literal), isizeof(literal) - 1, isizeof(literal) }
+#else
 #define strl(literal) ((String) { .data = (char*)(literal), .len = isizeof(literal) - 1, .cap = isizeof(literal) })
+#endif
 /// Creates the printf-style formatting arguments for the provided `String`.
 #define sfmt(s) (int)((s).len), (const char*)((s).data)
 /// Expands to a printf-style formatting sequence for printing a `String`.
@@ -5008,7 +5014,7 @@ CBA_DEF String str_from_current_date()
 #if CBA_WINDOWS
     SYSTEMTIME t = {0};
     GetLocalTime(&t);
-    str_appendf(&result, "%02u:%02u:%04u", t.wDay, t.wMonth, t.wYear);
+    str_appendf(&result, "%02u/%02u/%04u", t.wDay, t.wMonth, t.wYear);
 #else
     time_t now = time(0);
     struct tm* t = localtime(&now);
