@@ -1003,6 +1003,14 @@ CBA_DEF String git_branch_name();
 /// Returns the name of the committer for the currently checked out git commit, if found.
 CBA_DEF String git_committer_name();
 
+#define SORT_COMPARE_FN(name) i32 name(const void* a, const void* b)
+typedef SORT_COMPARE_FN(SortCompareFn);
+
+CBA_DEF void merge_sort(void* data,
+                        sz count,
+                        sz stride,
+                        SortCompareFn* compare_fn);
+
 // @mark: arena
 
 /// Global arena, used for all cba allocations.
@@ -2101,6 +2109,64 @@ CBA_DEF String git_committer_name()
     }
 
     return result;
+}
+
+CBA_DEF void _merge(void* data,
+                         sz stride,
+                         sz left,
+                         sz right,
+                         SortCompareFn* compare_fn)
+{
+    if (left < right)
+    {
+        sz mid = left + (right - left) / 2;
+
+        _merge(data, stride, left, mid, compare_fn);
+        _merge(data, stride, mid + 1, right, compare_fn);
+
+        sz s2 = mid + 1;
+        i32 cmp = compare_fn(data + stride * mid, data + stride * s2);
+
+        if (cmp > 0)
+        {
+            while ((left <= mid) && (s2 <= right))
+            {
+                cmp = compare_fn(data + stride * left, data + stride * s2);
+
+                if (cmp <= 0)
+                {
+                    left += 1;
+                }
+                else
+                {
+                    void* v = alloc_bytes(stride);
+                    memcpy(v, data + stride * s2, stride);
+
+                    sz i = s2;
+
+                    while (i != left)
+                    {
+                        memcpy(data + stride * i, data + stride * (i - 1), stride);
+                        i -= 1;
+                    }
+
+                    memcpy(data + stride * left, v, stride);
+
+                    left += 1;
+                    mid  += 1;
+                    s2   += 1;
+                }
+            }
+        }
+    }
+}
+
+CBA_DEF void merge_sort(void* data,
+                        sz count,
+                        sz stride,
+                        SortCompareFn* compare_fn)
+{
+    _merge(data, stride, 0, count - 1, compare_fn);
 }
 
 CBA_DEF void* arena_alloc(Arena* arena, sz size)
